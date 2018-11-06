@@ -180,11 +180,11 @@ class APIMAlertsHistory extends Widget {
     }
 
     createTableDataForAllAlerts(data) {
-        const {alertTypeNamesInDB} = Constants;
+        const {alertTypeNamesMapping} = Constants;
         let results = [];
         data.forEach(dataUnit => {
             results.push([Moment(dataUnit[0]).format('YYYY-MMM-DD hh:mm:ss A'),
-                alertTypeNamesInDB[dataUnit[1]], dataUnit[3], this.getSeverityLevel(dataUnit[2])])
+                alertTypeNamesMapping[dataUnit[1]], dataUnit[3], this.getSeverityLevel(dataUnit[2])])
         });
         return results;
     }

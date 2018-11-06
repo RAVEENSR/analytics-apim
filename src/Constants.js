@@ -37,9 +37,9 @@ const Constants = {
         healthAvailability:'Health Availability',
         abnormalResourceAccessPattern: 'Abnormal Resource Access Pattern'
     },
-    alertTypeNamesInDB : {
+    alertTypeNamesMapping : {
         UnusualIPAccess: 'Unseen Source IP Address',
-        abnormalRequestCount: 'Abnormal Request Count',
+        AbnormalRequestsPerMin: 'Abnormal Request Count',
         AbnormalResponseTime:'Abnormal Response Time',
         FrequentTierLimitHitting: 'Tier Crossing',
         AbnormalBackendTime: 'Abnormal Backend Time',
