@@ -1,0 +1,34 @@
+{
+    "name": "APIM Alerts History",
+    "id": "APIMAlertsHistory",
+    "thumbnailURL": "",
+    "configs": {
+      "pubsub": {
+        "types": [
+          "subscriber"
+        ]
+      },
+      "providerConfig" : {
+        "configs": {
+            "type": "SiddhiStoreDataProvider",
+            "config": {
+                "siddhiApp": "@App:name('AlertsHistory') @store(type = 'rdbms', datasource = 'APIM_ANALYTICS_DB') define table ApimAllAlert (type string, tenantDomain string, message string, severity int, alertTimestamp long); @store(type = 'rdbms', datasource = 'APIM_ANALYTICS_DB') define table ApimAbnormalResponseTimeAlert( apiName string, apiVersion string, apiCreator string, apiCreatorTenantDomain string, apiResourceTemplate string, apiMethod string, responseTime long,thresholdResponseTime long, message string, severity int, alertTimestamp long); @store(type = 'rdbms', datasource  ='APIM_ANALYTICS_DB') define table ApimAbnormalBackendTimeAlert (apiName string, apiVersion string, apiCreator string, apiCreatorTenantDomain string, apiResourceTemplate string, apiMethod string, backendTime long, thresholdBackendTime long, message string, severity int, alertTimestamp long); @store(type = 'rdbms', datasource = 'APIM_ANALYTICS_DB') define table ApimAbnormalReqAlert(applicationName string, applicationOwner string, tenantDomain string, apiName string,apiVersion string,requestCountPerMin long,   thresholdRequestCountPerMin int, message string,severity int, alertTimestamp long); @store(type = 'rdbms', datasource = 'APIM_ANALYTICS_DB') define table ApimRequestPatternChangedAlert (username string, applicationName string, applicationOwner string, tenantDomain string, message string, severity int, alertTimestamp long); @store(type = 'rdbms', datasource = 'APIM_ANALYTICS_DB') define table ApimIPAccessAbnormalityAlert (type string, message string, severity int, ip string, applicationName string, applicationOwner string, username string,tenantDomain string, requestTimestamp long, alertTimestamp long); @store(type = 'rdbms', datasource = 'APIM_ANALYTICS_DB') define table ApimTierLimitHittingAlert (subscriber string, apiCreator string, apiName string, applicationId string, applicationName string, apiCreatorTenantDomain string, userTenantDomain string, message string, severity int, alertTimestamp long); @store(type = 'rdbms', datasource = 'APIM_ANALYTICS_DB') define table ApimApiHealthMonitorAlert(apiName string,apiVersion string,apiCreator string, apiCreatorTenantDomain string, message string, severity int, alertTimestamp long);",
+                "queryData": {
+                  "queryApimAllAlert": "from ApimAllAlert on alertTimestamp >= '{{timeFrom}}' AND alertTimestamp <= '{{timeTo}}' select alertTimestamp, type, severity, message order by alertTimestamp desc;",
+                  "queryApimAbnormalResponseTimeAlert": "from ApimAbnormalResponseTimeAlert on alertTimestamp >= '{{timeFrom}}' AND alertTimestamp <= '{{timeTo}}' select alertTimestamp, severity, message, apiName, apiVersion, apiCreator, apiResourceTemplate, apiMethod order by alertTimestamp desc;",
+                  "queryApimAbnormalBackendTimeAlert": "from ApimAbnormalBackendTimeAlert on alertTimestamp >= '{{timeFrom}}' AND alertTimestamp <= '{{timeTo}}' select alertTimestamp, severity, message, apiName, apiVersion, apiCreator, apiResourceTemplate, apiMethod order by alertTimestamp desc;",
+                  "queryApimAbnormalReqAlert": "from ApimAbnormalReqAlert on alertTimestamp >= '{{timeFrom}}' AND alertTimestamp <= '{{timeTo}}' select alertTimestamp, severity, message, applicationName, applicationOwner, apiName, apiVersion order by alertTimestamp desc;",
+                  "queryApimRequestPatternChangedAlert": "from ApimRequestPatternChangedAlert on alertTimestamp >= '{{timeFrom}}' AND alertTimestamp <= '{{timeTo}}' select alertTimestamp, severity, message, username, applicationName, applicationOwner order by alertTimestamp desc;",
+                  "queryApimIPAccessAbnormalityAlert": "from ApimIPAccessAbnormalityAlert on alertTimestamp >= '{{timeFrom}}' AND alertTimestamp <= '{{timeTo}}' select alertTimestamp, severity, message, ip, applicationName, applicationOwner, username order by alertTimestamp desc;",
+                  "queryApimTierLimitHittingAlert": "from ApimTierLimitHittingAlert on alertTimestamp >= '{{timeFrom}}' AND alertTimestamp <= '{{timeTo}}' select alertTimestamp, severity, message, subscriber, apiCreator, apiName, applicationId, applicationName order by alertTimestamp desc;",
+                  "queryApimApiHealthMonitorAlert": "from ApimApiHealthMonitorAlert select alertTimestamp, severity, message, apiName, apiVersion, apiCreator;"
+                },
+                "publishingInterval": 60
+            }
+        }   
+      
+      }
+     
+	}
+}
+
