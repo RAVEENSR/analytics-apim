@@ -58,10 +58,10 @@ export default class CustomTablePaginationAction extends React.Component {
             let page = 0;
             if (event.target.value > 0) {
                 const maxPage = Math.ceil(this.props.count / this.props.rowsPerPage);
-                if (event.target.value <= maxPage) {
-                    page = event.target.value - 1;
-                } else {
+                if (event.target.value > maxPage) {
                     page = maxPage - 1;
+                } else {
+                    page = event.target.value - 1;
                 }
             }
             this.setState({selectedPage: page + 1});

@@ -80,7 +80,6 @@ class APIMAlertsHistory extends Widget {
         this.handlePublisherParameters = this.handlePublisherParameters.bind(this);
         this.handleTableUpdate = this.handleTableUpdate.bind(this);
         this.getSeverityLevel = this.getSeverityLevel.bind(this);
-        this.getAlertsHistory = this.getAlertsHistory.bind(this);
         this.getAlertTypeSelector = this.getAlertTypeSelector.bind(this);
         this.getAlertFilter = this.getAlertFilter.bind(this);
         this.handleFilterClick = this.handleFilterClick.bind(this);
@@ -91,6 +90,9 @@ class APIMAlertsHistory extends Widget {
         this.filterDataUsingAllFilters = this.filterDataUsingAllFilters.bind(this);
     }
 
+    componentWillUnmount() {
+        super.getWidgetChannelManager().unsubscribeWidget(this.props.id);
+    }
 
     componentWillMount() {
         super.subscribe(this.handlePublisherParameters);
@@ -101,6 +103,29 @@ class APIMAlertsHistory extends Widget {
             timeFrom: message.from,
             timeTo: message.to
         }, this.handleTableUpdate);
+    }
+
+    handleTableUpdate() {
+        this.checkAvailabilityOFQueryParams();
+        const {alertType, timeFrom, timeTo} = this.state;
+        const {queryNames} = Constants;
+        super.getWidgetConfiguration(this.props.widgetID)
+            .then((message) => {
+                let query = message.data.configs.providerConfig.configs.config
+                    .queryData[queryNames[alertType]];
+                query = query
+                    .replace("{{timeFrom}}", timeFrom)
+                    .replace("{{timeTo}}", timeTo);
+                message.data.configs.providerConfig.configs.config.queryData.query = query;
+                super.getWidgetChannelManager().subscribeWidget(
+                    this.props.id, this.handleDataReceived, message.data.configs.providerConfig);
+            })
+            .catch((error) => {
+                console.error("Error occurred when loading widget \'" + this.props.widgetID + "\'. " + error);
+                this.setState({
+                    faultyProviderConf: true
+                });
+            });
     }
 
     checkAvailabilityOFQueryParams() {
@@ -135,29 +160,6 @@ class APIMAlertsHistory extends Widget {
         return result;
     }
 
-    handleTableUpdate() {
-        this.checkAvailabilityOFQueryParams();
-        const {alertType, timeFrom, timeTo} = this.state;
-        const {queryNames} = Constants;
-        super.getWidgetConfiguration(this.props.widgetID)
-            .then((message) => {
-                let query = message.data.configs.providerConfig.configs.config
-                    .queryData[queryNames[alertType]];
-                query = query
-                    .replace("{{timeFrom}}", timeFrom)
-                    .replace("{{timeTo}}", timeTo);
-                message.data.configs.providerConfig.configs.config.queryData.query = query;
-                super.getWidgetChannelManager().subscribeWidget(
-                    this.props.id, this.handleDataReceived, message.data.configs.providerConfig);
-            })
-            .catch((error) => {
-                console.error("Error occurred when loading widget \'" + this.props.widgetID + "\'. " + error);
-                this.setState({
-                    faultyProviderConf: true
-                });
-            });
-    }
-
     handleDataReceived(message) {
         if (message.data) {
             let results = [];
@@ -173,10 +175,6 @@ class APIMAlertsHistory extends Widget {
                 filteredRows: this.filterDataUsingAllFilters(results)
             });
         }
-    }
-
-    componentWillUnmount() {
-        super.getWidgetChannelManager().unsubscribeWidget(this.props.id);
     }
 
     createTableDataForAllAlerts(data) {
@@ -199,6 +197,52 @@ class APIMAlertsHistory extends Widget {
                 message, this.getSeverityLevel(dataUnit[1])])
         });
         return results;
+    }
+
+    getSeverityLevel(severity) {
+        let severityLevel = '';
+        switch (severity) {
+            case 1:
+                severityLevel =
+                    <span style={{
+                        fontWeight: 'bold',
+                        backgroundColor: '#d9534f',
+                        borderRadius: '5px',
+                        padding: '5px',
+                        verticalAlign: 'center'
+                    }}>
+                Severe
+                </span>;
+                break;
+            case 2:
+                severityLevel =
+                    <span
+                        style={{
+                            fontWeight: 'bold',
+                            backgroundColor: '#f0ad4e',
+                            borderRadius: '5px',
+                            padding: '5px',
+                            verticalAlign: 'center'
+                        }}>
+                Moderate
+                </span>;
+                break;
+            case 3:
+                severityLevel =
+                    <span style={{
+                        fontWeight: 'bold',
+                        backgroundColor: '#777777',
+                        borderRadius: '5px',
+                        padding: '5px',
+                        verticalAlign: 'center'
+                    }}>
+                Mild
+                </span>;
+                break;
+            default:
+            //        not reached
+        }
+        return severityLevel;
     }
 
     createAlertMessageKeyValuePairs(messageFieldNames, messageFieldValues) {
@@ -317,52 +361,6 @@ class APIMAlertsHistory extends Widget {
                         </span> {elementValue}
                 </div>
             </div>);
-    }
-
-    getSeverityLevel(severity) {
-        let severityLevel = '';
-        switch (severity) {
-            case 1:
-                severityLevel =
-                    <span style={{
-                        fontWeight: 'bold',
-                        backgroundColor: '#d9534f',
-                        borderRadius: '5px',
-                        padding: '5px',
-                        verticalAlign: 'center'
-                    }}>
-                Severe
-                </span>;
-                break;
-            case 2:
-                severityLevel =
-                    <span
-                        style={{
-                            fontWeight: 'bold',
-                            backgroundColor: '#f0ad4e',
-                            borderRadius: '5px',
-                            padding: '5px',
-                            verticalAlign: 'center'
-                        }}>
-                Moderate
-                </span>;
-                break;
-            case 3:
-                severityLevel =
-                    <span style={{
-                        fontWeight: 'bold',
-                        backgroundColor: '#777777',
-                        borderRadius: '5px',
-                        padding: '5px',
-                        verticalAlign: 'center'
-                    }}>
-                Mild
-                </span>;
-                break;
-            default:
-            //        not reached
-        }
-        return severityLevel;
     }
 
     handleAlertTypeChange = event => {
@@ -587,6 +585,58 @@ class APIMAlertsHistory extends Widget {
         }, this.setQueryParam);
     }
 
+    filterDataUsingSingleFilter(data, filterColumn, filterValue) {
+        let filterResults = [];
+        const {alertsHistoryTableColumnNames, message, severity, alertTypeKeys} = Constants;
+        const {alertType} = this.state;
+        const index = alertsHistoryTableColumnNames.indexOf(this.capitalizeCaseFirstChar(filterColumn));
+        if (index !== -1) {
+            if (alertType === alertTypeKeys.allAlerts) {
+                data.forEach(dataUnit => {
+                    if (filterColumn === severity && dataUnit[index].props.children.toString().toLowerCase()
+                        .includes(filterValue.toString().toLowerCase())) {
+                        filterResults.push(dataUnit);
+                    } else if (dataUnit[index].toString().toLowerCase().includes(
+                        filterValue.toString().toLowerCase())) {
+                        filterResults.push(dataUnit);
+                    }
+                })
+            } else {
+                data.forEach(dataUnit => {
+                    if (filterColumn === message) {
+                        if (dataUnit[index].props.children.some(child =>
+                            child && (child.props.children.props.children[0].props.children.toString().toLowerCase()
+                                .includes(filterValue.toString().toLowerCase())
+                            || child.props.children.props.children[2].toString().toLowerCase()
+                                .includes(filterValue.toString().toLowerCase())))) {
+                            filterResults.push(dataUnit);
+                        }
+                    } else if (filterColumn === severity && dataUnit[index].props.children.toString().toLowerCase()
+                        .includes(filterValue.toString().toLowerCase())) {
+                        filterResults.push(dataUnit);
+                    } else if (dataUnit[index].toString().toLowerCase()
+                        .includes(filterValue.toString().toLowerCase())) {
+                        filterResults.push(dataUnit);
+                    }
+                })
+            }
+        } else {
+            filterResults = data;
+        }
+        return filterResults;
+    }
+
+    filterDataUsingAllFilters(data) {
+        const {filterValues} = this.state;
+        let filteredRows = data;
+        Object.keys(filterValues).forEach(column => {
+            filterValues[column].forEach(value => {
+                filteredRows = this.filterDataUsingSingleFilter(filteredRows, column, value);
+            })
+        });
+        return filteredRows;
+    }
+
     createFilterTableData() {
         const {filterValues, rows} = this.state;
         let filterData = [];
@@ -605,7 +655,6 @@ class APIMAlertsHistory extends Widget {
                             }
                             const filteredRows = this.filterDataUsingAllFilters(rows);
                             this.setState({filterValues, filteredRows}, this.setQueryParam);
-                            this.validateNewFilter();
                         }}
                         style={{color: '#dc3545'}}
                     >
@@ -614,106 +663,6 @@ class APIMAlertsHistory extends Widget {
             })
         });
         return filterData;
-    }
-
-    filterDataUsingAllFilters(data) {
-        const {filterValues} = this.state;
-        let filteredRows = data;
-        Object.keys(filterValues).forEach(column => {
-            filterValues[column].forEach(value => {
-                filteredRows = this.filterDataUsingSingleFilter(filteredRows, column, value);
-            })
-        });
-        return filteredRows;
-    }
-
-    filterDataUsingSingleFilter(data, filterColumn, filterValue) {
-        let filterResults = [];
-        const {alertsHistoryTableColumnNames, message, severity, alertTypeKeys} = Constants;
-        const {alertType} = this.state;
-        const index = alertsHistoryTableColumnNames.indexOf(this.capitalizeCaseFirstChar(filterColumn));
-        if (index !== -1) {
-            data.forEach(dataUnit => {
-                if (alertType === alertTypeKeys.allAlerts) {
-                    if (filterColumn === severity && dataUnit[index].props.children.toString().toLowerCase()
-                        .includes(filterValue.toString().toLowerCase())) {
-                        filterResults.push(dataUnit);
-                    } else if (dataUnit[index].toString().toLowerCase().includes(
-                        filterValue.toString().toLowerCase())) {
-                        filterResults.push(dataUnit);
-                    }
-                } else {
-                    if (filterColumn === message) {
-                        if (dataUnit[index].props.children.some(child =>
-                            child && (child.props.children.props.children[0].props.children.toString().toLowerCase()
-                                .includes(filterValue.toString().toLowerCase())
-                            || child.props.children.props.children[2].toString().toLowerCase()
-                                .includes(filterValue.toString().toLowerCase())))) {
-                            filterResults.push(dataUnit);
-                        }
-                    } else if (filterColumn === severity && dataUnit[index].props.children.toString().toLowerCase()
-                        .includes(filterValue.toString().toLowerCase())) {
-                        filterResults.push(dataUnit);
-                    } else if (dataUnit[index].toString().toLowerCase()
-                        .includes(filterValue.toString().toLowerCase())) {
-                        filterResults.push(dataUnit);
-                    }
-                }
-            })
-        } else {
-            filterResults = data;
-        }
-        return filterResults;
-    }
-
-    getAlertsHistory() {
-        const {alertsHistoryTableColumnNames} = Constants;
-        const {width, filteredRows} = this.state;
-        const {muiTheme} = this.props;
-        return (
-            <div
-                style={{
-                    paddingTop: 10,
-                    paddingBottom: 10,
-                    paddingLeft: 5,
-                    paddingRight: 5,
-                }}
-            >
-                <div
-                    style={{
-                        display: 'flex',
-                        paddingBottom: 20,
-                        paddingLeft: 15,
-                        paddingRight: 15,
-                    }}
-                >
-                    <div
-                        style={{
-                            width: width * 0.5
-                        }}>
-                        {this.getAlertTypeSelector()}
-                    </div>
-                    <div
-                        style={{
-                            width: width * 0.5,
-                            paddingTop: 15
-                        }}>
-                        {this.getAlertFilter()}
-                    </div>
-                </div>
-                <CustomTable
-                    tableColumnNames={alertsHistoryTableColumnNames}
-                    data={filteredRows}
-                    theme={muiTheme}
-                    width={width}
-                    requirePagination={true}
-                />
-            </div>
-        );
-    }
-
-    print() {
-        console.log(this.state)
     }
 
     setQueryParam() {
@@ -730,12 +679,51 @@ class APIMAlertsHistory extends Widget {
     }
 
     render() {
+        const {alertsHistoryTableColumnNames} = Constants;
+        const {width, filteredRows} = this.state;
+        const {muiTheme} = this.props;
         return (
             <MuiThemeProvider
                 theme={this.props.muiTheme.name === 'dark' ? darkTheme : lightTheme}>
                 <Scrollbars
                     style={{height: this.state.height}}>
-                    {this.getAlertsHistory()}
+                    <div
+                        style={{
+                            paddingTop: 10,
+                            paddingBottom: 10,
+                            paddingLeft: 5,
+                            paddingRight: 5,
+                        }}
+                    >
+                        <div
+                            style={{
+                                display: 'flex',
+                                paddingBottom: 20,
+                                paddingLeft: 15,
+                                paddingRight: 15,
+                            }}
+                        >
+                            <div
+                                style={{
+                                    width: width * 0.5
+                                }}>
+                                {this.getAlertTypeSelector()}
+                            </div>
+                            <div
+                                style={{
+                                    width: width * 0.5,
+                                    paddingTop: 15
+                                }}>
+                                {this.getAlertFilter()}
+                            </div>
+                        </div>
+                        <CustomTable
+                            tableColumnNames={alertsHistoryTableColumnNames}
+                            data={filteredRows}
+                            theme={muiTheme}
+                            requirePagination={true}
+                        />
+                    </div>
                 </Scrollbars>
             </MuiThemeProvider>
         );

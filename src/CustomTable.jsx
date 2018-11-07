@@ -46,7 +46,7 @@ export default class CustomTable extends React.Component {
     };
 
     handleChangeRowsPerPage = event => {
-        this.setState({rowsPerPage: event.target.value,});
+        this.setState({rowsPerPage: event.target.value});
     };
 
     getEmptyRowsNumber(rowsCount, rowsPerPage, page) {
