@@ -98,6 +98,9 @@ class APIMAlertsHistory extends Widget {
         super.subscribe(this.handlePublisherParameters);
     }
 
+    /**
+     * handlePublisherParameters handles data published from apim date range picker
+     **/
     handlePublisherParameters(message) {
         this.setState({
             timeFrom: message.from,
@@ -105,6 +108,9 @@ class APIMAlertsHistory extends Widget {
         }, this.handleTableUpdate);
     }
 
+    /**
+     * handleTableUpdate retrieves data from alert tables
+     * */
     handleTableUpdate() {
         this.checkAvailabilityOFQueryParams();
         const {alertType, timeFrom, timeTo} = this.state;
@@ -128,6 +134,9 @@ class APIMAlertsHistory extends Widget {
             });
     }
 
+    /**
+     * checkAvailabilityOFQueryParams checks whether query params are available specifying alert type and filters
+     * */
     checkAvailabilityOFQueryParams() {
         const {queryParamKey, alertTypes, alertTypeKeys, alertsHistoryTableColumnNames} = Constants;
         const queryParams = super.getGlobalState(queryParamKey);
@@ -152,6 +161,9 @@ class APIMAlertsHistory extends Widget {
         this.setQueryParam();
     }
 
+    /**
+     * capitalizeCaseFirstChar capitalise the first character of a given string
+     * */
     capitalizeCaseFirstChar(str) {
         let result = '';
         if (str) {
@@ -160,6 +172,9 @@ class APIMAlertsHistory extends Widget {
         return result;
     }
 
+    /**
+     * handleDataReceived loads data retrieved to alerts history table
+     * */
     handleDataReceived(message) {
         if (message.data) {
             let results = [];
@@ -177,6 +192,9 @@ class APIMAlertsHistory extends Widget {
         }
     }
 
+    /**
+     * createTableDataForAllAlerts loads data to alerts history table for alert type 'All alerts'
+     * */
     createTableDataForAllAlerts(data) {
         const {alertTypeNamesMapping} = Constants;
         let results = [];
@@ -187,6 +205,9 @@ class APIMAlertsHistory extends Widget {
         return results;
     }
 
+    /**
+     * createTableDataForSpecificAlerts loads data to alerts history table for alert type other than 'All alerts'
+     * */
     createTableDataForSpecificAlerts(alertType, data) {
         const {alertTypes, alertMessageFieldsForAlertType} = Constants;
         let results = [];
@@ -199,6 +220,9 @@ class APIMAlertsHistory extends Widget {
         return results;
     }
 
+    /**
+     * getSeverityLevel return alert severity
+     * */
     getSeverityLevel(severity) {
         let severityLevel = '';
         switch (severity) {
@@ -245,6 +269,10 @@ class APIMAlertsHistory extends Widget {
         return severityLevel;
     }
 
+    /**
+     * createAlertMessageKeyValuePairs creates a key value pairs for the alert details message for alerts types other
+     * than 'All alerts'
+     * */
     createAlertMessageKeyValuePairs(messageFieldNames, messageFieldValues) {
         let result = {};
         messageFieldNames.forEach((data, index) => {
@@ -253,6 +281,9 @@ class APIMAlertsHistory extends Widget {
         return result;
     }
 
+    /**
+     * createAlertMessageElementsForAlerts creates alert details messagefor alerts types other than 'All alerts'
+     * */
     createAlertMessageElementsForAlerts(data, message) {
         const {alertMessageFieldNames} = Constants;
         const userId = data['userId'];
@@ -303,26 +334,6 @@ class APIMAlertsHistory extends Widget {
         if (method) {
             result.push(this.getAlertMessageElement(alertMessageFieldNames.method, method));
         }
-        //
-        if (backendTime) {
-            result.push(this.getAlertMessageElement(alertMessageFieldNames.backendTime, backendTime));
-        }
-        //
-        if (requestPerMin) {
-            result.push(this.getAlertMessageElement(alertMessageFieldNames.requestPerMin, requestPerMin));
-        }
-        //
-        if (reason) {
-            result.push(this.getAlertMessageElement(alertMessageFieldNames.reason, reason));
-        }
-        //
-        if (scope) {
-            result.push(this.getAlertMessageElement(alertMessageFieldNames.scope, scope));
-        }
-        //
-        if (consumerKey) {
-            result.push(this.getAlertMessageElement(alertMessageFieldNames.consumerKey, consumerKey));
-        }
         if (subscriber) {
             result.push(this.getAlertMessageElement(alertMessageFieldNames.subscriber, subscriber));
         }
@@ -363,6 +374,9 @@ class APIMAlertsHistory extends Widget {
             </div>);
     }
 
+    /**
+     * handleAlertTypeChange handle change in selected alert type
+     * */
     handleAlertTypeChange = event => {
         this.state.alertType = event.target.value;
         this.setState({
@@ -371,11 +385,17 @@ class APIMAlertsHistory extends Widget {
         this.setQueryParam();
     };
 
+    /**
+     * fetchAlertData when alert type is changed fetch data for the specific alert type
+     * */
     fetchAlertData() {
         super.getWidgetChannelManager().unsubscribeWidget(this.props.id);
         this.handleTableUpdate();
     }
 
+    /**
+     * getAlertTypeSelector return the select field used to select alert type
+     * */
     getAlertTypeSelector() {
         const {alertTypes, alertTypeKeys} = Constants;
         return (
@@ -427,6 +447,9 @@ class APIMAlertsHistory extends Widget {
         );
     }
 
+    /**
+     * getAlertFilter returns a popover containing filter details
+     * */
     getAlertFilter() {
         const {openFilterConfig, filterConfigAnchorEl, rows, filterValues} = this.state;
         const {muiTheme} = this.props;
@@ -489,6 +512,9 @@ class APIMAlertsHistory extends Widget {
         );
     }
 
+    /**
+     * handleFilterClick opens the filter detail popover
+     * */
     handleFilterClick(event) {
         event.preventDefault();
         this.setState({
@@ -497,12 +523,18 @@ class APIMAlertsHistory extends Widget {
         });
     }
 
+    /**
+     * handleRequestClose closes the filter detail popover
+     * */
     handleRequestClose() {
         this.setState({
             openFilterConfig: false,
         });
     }
 
+    /**
+     * createNewAlertFilter provide configurations to add a new filter
+     * */
     createNewAlertFilter() {
         const {alertsHistoryTableColumnNames} = Constants;
         const {invalidFilter, newFilterColumn, newFilterValue, width} = this.state;
@@ -559,6 +591,9 @@ class APIMAlertsHistory extends Widget {
         )
     }
 
+    /**
+     * validateNewFilter check whether the filter already exists
+     * */
     validateNewFilter() {
         let {filterValues, newFilterColumn, newFilterValue} = this.state;
         if (filterValues[newFilterColumn] && filterValues[newFilterColumn].indexOf(newFilterValue) !== -1) {
@@ -568,6 +603,9 @@ class APIMAlertsHistory extends Widget {
         }
     }
 
+    /**
+     * addFilter adds a new filter
+     * */
     addFilter() {
         let {filterValues, newFilterColumn, newFilterValue, filteredRows} = this.state;
         if (filterValues[newFilterColumn]) {
@@ -585,6 +623,9 @@ class APIMAlertsHistory extends Widget {
         }, this.setQueryParam);
     }
 
+    /**
+     * filterDataUsingSingleFilter data using a single filter
+     * */
     filterDataUsingSingleFilter(data, filterColumn, filterValue) {
         let filterResults = [];
         const {alertsHistoryTableColumnNames, message, severity, alertTypeKeys} = Constants;
@@ -626,6 +667,9 @@ class APIMAlertsHistory extends Widget {
         return filterResults;
     }
 
+    /**
+     * filterDataUsingAllFilters filter data using all filters
+     * */
     filterDataUsingAllFilters(data) {
         const {filterValues} = this.state;
         let filteredRows = data;
@@ -637,6 +681,9 @@ class APIMAlertsHistory extends Widget {
         return filteredRows;
     }
 
+    /**
+     * createFilterTableData display the filters in a table
+     * */
     createFilterTableData() {
         const {filterValues, rows} = this.state;
         let filterData = [];
@@ -665,6 +712,9 @@ class APIMAlertsHistory extends Widget {
         return filterData;
     }
 
+    /**
+     * setQueryParam set alert type and filters as query params
+     * */
     setQueryParam() {
         const {queryParamKey} = Constants;
         const {alertType, filterValues} = this.state;
@@ -678,6 +728,9 @@ class APIMAlertsHistory extends Widget {
         }
     }
 
+    /**
+     * render the alerts history table
+     * */
     render() {
         const {alertsHistoryTableColumnNames} = Constants;
         const {width, filteredRows} = this.state;

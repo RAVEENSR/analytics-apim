@@ -41,14 +41,23 @@ export default class CustomTable extends React.Component {
         };
     }
 
+    /**
+     * handleChangePage handle change in selected page
+     * */
     handleChangePage = (event, page) => {
         this.setState({page});
     };
 
+    /**
+     * handleChangeRowsPerPage handle change in rows per page
+     * */
     handleChangeRowsPerPage = event => {
         this.setState({rowsPerPage: event.target.value});
     };
 
+    /**
+     * getEmptyRowsNumber returns the number of empty rows needed to fill the table
+     * */
     getEmptyRowsNumber(rowsCount, rowsPerPage, page) {
         if (Math.ceil(rowsCount / rowsPerPage) === 1) {
             return null;
@@ -57,26 +66,9 @@ export default class CustomTable extends React.Component {
         }
     }
 
-    getTableColumnNames(tableColumnNames) {
-        return tableColumnNames.map((header) => {
-            return (
-                <TableCell
-                    style={{background: this.props.theme.name === 'dark' ? '#2f2f31' : '#DCDCDC'}}>
-                    {header}
-                </TableCell>
-            );
-        });
-    }
-
-
-    getTableRowValues(row) {
-        return row.map((data) => {
-            return (
-                <TableCell> {data} </TableCell>
-            );
-        });
-    }
-
+    /**
+     * render custom table
+     * */
     render() {
         this.state.rows = this.props.data;
         const {rows, rowsPerPage, page, tableColumnNames, noDataMessage, requirePagination} = this.state;
@@ -87,7 +79,17 @@ export default class CustomTable extends React.Component {
                     <Table id='abs'>
                         <TableHead>
                             <TableRow>
-                                {this.getTableColumnNames(tableColumnNames)}
+                                {tableColumnNames.map((header) => {
+                                    return (
+                                        <TableCell
+                                            style={{
+                                                background: this.props.theme.name === 'dark' ?
+                                                    '#2f2f31' : '#DCDCDC'
+                                            }}>
+                                            {header}
+                                        </TableCell>
+                                    );
+                                })}
                             </TableRow>
                         </TableHead>
                         {rows.length > 0 ?
@@ -95,7 +97,11 @@ export default class CustomTable extends React.Component {
                                 {rows.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map(row => {
                                     return (
                                         <TableRow>
-                                            {this.getTableRowValues(row)}
+                                            {row.map((data) => {
+                                                return (
+                                                    <TableCell> {data} </TableCell>
+                                                );
+                                            })}
                                         </TableRow>
                                     );
                                 })}

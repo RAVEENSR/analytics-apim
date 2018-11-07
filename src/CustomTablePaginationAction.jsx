@@ -30,21 +30,33 @@ export default class CustomTablePaginationAction extends React.Component {
         this.state = {selectedPage: this.props.page + 1};
     }
 
+    /**
+     * handleFirstPageButtonClick loads data of the first page
+     * */
     handleFirstPageButtonClick = event => {
         this.state.selectedPage = 1;
         this.props.onChangePage(event, 0);
     };
 
+    /**
+     * handleBackButtonClick load data of the prev page
+     * */
     handleBackButtonClick = event => {
         this.state.selectedPage = this.props.page;
         this.props.onChangePage(event, this.props.page - 1);
     };
 
+    /**
+     * handleNextButtonClick load data of the next page
+     * */
     handleNextButtonClick = event => {
         this.state.selectedPage = this.props.page + 2;
         this.props.onChangePage(event, this.props.page + 1);
     };
 
+    /**
+     * handleLastPageButtonClick load data of the last page
+     * */
     handleLastPageButtonClick = event => {
         this.state.selectedPage = Math.ceil(this.props.count / this.props.rowsPerPage);
         this.props.onChangePage(
@@ -53,6 +65,9 @@ export default class CustomTablePaginationAction extends React.Component {
         );
     };
 
+    /**
+     * handleSelectedPageChange handle changes in selected page
+     * */
     handleSelectedPageChange = event => {
         if (event.target.value !== '') {
             let page = 0;
@@ -71,6 +86,9 @@ export default class CustomTablePaginationAction extends React.Component {
         }
     };
 
+    /**
+     * verifySelectedPageNumber check whether the selected page is valid
+     * */
     verifySelectedPageNumber() {
         const {count, rowsPerPage} = this.props;
         if (count === 0
