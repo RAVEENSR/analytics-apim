@@ -21,20 +21,17 @@ import React from 'react';
 import Widget from '@wso2-dashboards/widget';
 import CustomTable from './CustomTable';
 import {MuiThemeProvider, createMuiTheme} from '@material-ui/core/styles';
-import IconButton from '@material-ui/core/IconButton';
-import TextField from '@material-ui/core/TextField';
-import Popover from '@material-ui/core/Popover';
 import Select from '@material-ui/core/Select';
 import MenuItem from '@material-ui/core/MenuItem';
 import FormControl from '@material-ui/core/FormControl';
 import InputLabel from '@material-ui/core/InputLabel';
-import Search from '@material-ui/icons/Search';
-import ClearAll from '@material-ui/icons/ClearAll';
-import Add from '@material-ui/icons/Add';
-import Delete from '@material-ui/icons/Delete';
 import Moment from "moment";
 import {Scrollbars} from 'react-custom-scrollbars';
+import {defineMessages, IntlProvider, FormattedMessage} from 'react-intl';
 import Constants from './Constants';
+import localeJSON from './resources/locale.json';
+import DateRangePicker from './DateRangePicker';
+import AlertsFilter from './AlertsFilter';
 
 const darkTheme = createMuiTheme({
     palette: {
@@ -48,14 +45,26 @@ const lightTheme = createMuiTheme({
     }
 });
 
-class APIMAlertsHistory extends Widget {
+/**
+ * Language.
+ * @type {string}
+ */
+const language = (navigator.languages && navigator.languages[0]) || navigator.language || navigator.userLanguage;
 
+/**
+ * Language without region code.
+ */
+const languageWithoutRegionCode = language.toLowerCase().split(/[_-]+/)[0];
+
+class APIMAlertsHistory extends Widget {
     constructor(props) {
         super(props);
 
         this.state = {
+            localeMessages: {},
             width: this.props.glContainer.width,
             height: this.props.glContainer.height,
+            options: this.props.configs.options,
             rows: [],
             filteredRows: [],
             filterValues: {},
@@ -64,10 +73,14 @@ class APIMAlertsHistory extends Widget {
             timeFrom: null,
             openFilterConfig: false,
             filterConfigAnchorEl: null,
-            newFilterColumn: Constants.alertsHistoryTableColumnNames[2].toLowerCase(),
-            newFilterValue: '',
-            invalidFilter: false
+            newFilterErrorText: '',
+            invalidFilter: false,
+            dataProviderConf: null,
+            selectedTimeRange: '',
+            syncTimeRange: false
         };
+        this.alertTableNoDataMessage = 'No alerts history available';
+        this.initFilterValues={};
 
         this.props.glContainer.on('resize', () =>
             this.setState({
@@ -77,34 +90,56 @@ class APIMAlertsHistory extends Widget {
         );
 
         this.handleDataReceived = this.handleDataReceived.bind(this);
-        this.handlePublisherParameters = this.handlePublisherParameters.bind(this);
         this.handleTableUpdate = this.handleTableUpdate.bind(this);
         this.getSeverityLevel = this.getSeverityLevel.bind(this);
         this.getAlertTypeSelector = this.getAlertTypeSelector.bind(this);
-        this.getAlertFilter = this.getAlertFilter.bind(this);
-        this.handleFilterClick = this.handleFilterClick.bind(this);
-        this.handleRequestClose = this.handleRequestClose.bind(this);
-        this.validateNewFilter = this.validateNewFilter.bind(this);
-        this.addFilter = this.addFilter.bind(this);
         this.capitalizeCaseFirstChar = this.capitalizeCaseFirstChar.bind(this);
         this.filterDataUsingAllFilters = this.filterDataUsingAllFilters.bind(this);
+        this.handleRequestSort = this.handleRequestSort.bind(this);
+        this.onChangeTime = this.onChangeTime.bind(this);
+        this.getTimeRangeFromQueryParam = this.getTimeRangeFromQueryParam.bind(this);
+        this.onChangeSyncTimeRange = this.onChangeSyncTimeRange.bind(this);
+        this.onDeleteAllFilters = this.onDeleteAllFilters.bind(this);
+        this.onAddOrDeleteFilter = this.onAddOrDeleteFilter.bind(this);
+        this.getFilterValuesFromQueryParam = this.getFilterValuesFromQueryParam.bind(this);
     }
 
     componentWillUnmount() {
         super.getWidgetChannelManager().unsubscribeWidget(this.props.id);
     }
 
+    /**
+     * Initialize i18n.
+     */
     componentWillMount() {
-        super.subscribe(this.handlePublisherParameters);
-    }
+        const locale = (languageWithoutRegionCode || language || 'en');
+
+        this.setState({localeMessages: defineMessages(localeJSON[locale]) || {}});
+        this.initFilterValues =this.getFilterValuesFromQueryParam();
+        super.getWidgetConfiguration(this.props.widgetID)
+            .then((message) => {
+                this.setState({
+                    dataProviderConf: message.data.configs.providerConfig
+                }, () => {
+                    this.handleTableUpdate()
+                });
+            })
+            .catch(() => {
+                this.setState({
+                    faultyProviderConf: true,
+                });
+            });
+    };
 
     /**
-     * handlePublisherParameters handles data published from apim date range picker
-     **/
-    handlePublisherParameters(message) {
+     * onChangeTime handles change in selected time range
+     * */
+    onChangeTime(selectedTimeRange, timeFrom, timeTo) {
         this.setState({
-            timeFrom: message.from,
-            timeTo: message.to
+            timeFrom,
+            timeTo,
+            selectedTimeRange,
+            filteredRows:[]
         }, this.handleTableUpdate);
     }
 
@@ -112,41 +147,74 @@ class APIMAlertsHistory extends Widget {
      * handleTableUpdate retrieves data from alert tables
      * */
     handleTableUpdate() {
-        this.checkAvailabilityOFQueryParams();
-        const {alertType, timeFrom, timeTo} = this.state;
+        const queryParam = this.getQueryParams();
+        const {timeFrom, timeTo, dataProviderConf} = this.state;
         const {queryNames} = Constants;
-        super.getWidgetConfiguration(this.props.widgetID)
-            .then((message) => {
-                let query = message.data.configs.providerConfig.configs.config
-                    .queryData[queryNames[alertType]];
-                query = query
-                    .replace("{{timeFrom}}", timeFrom)
-                    .replace("{{timeTo}}", timeTo);
-                message.data.configs.providerConfig.configs.config.queryData.query = query;
-                super.getWidgetChannelManager().subscribeWidget(
-                    this.props.id, this.handleDataReceived, message.data.configs.providerConfig);
-            })
-            .catch((error) => {
-                console.error("Error occurred when loading widget \'" + this.props.widgetID + "\'. " + error);
-                this.setState({
-                    faultyProviderConf: true
-                });
-            });
+
+        if (dataProviderConf) {
+            let query = dataProviderConf.configs.config.queryData[queryNames[queryParam.alertType]];
+            query = query
+                .replace("{{timeFrom}}", timeFrom)
+                .replace("{{timeTo}}", timeTo);
+            dataProviderConf.configs.config.queryData.query = query;
+            this.alertTableNoDataMessage = 'Fetching alerts history';
+            this.setState({
+                alertType: queryParam.alertType,
+                filterValues: queryParam.filterValues,
+            }, this.setQueryParam);
+            super.getWidgetChannelManager().subscribeWidget(this.props.id, this.handleDataReceived, dataProviderConf);
+        }
     }
 
     /**
-     * checkAvailabilityOFQueryParams checks whether query params are available specifying alert type and filters
+     * getQueryParams checks whether query params are available specifying alert type and filters
      * */
-    checkAvailabilityOFQueryParams() {
-        const {queryParamKey, alertTypes, alertTypeKeys, alertsHistoryTableColumnNames} = Constants;
+    getQueryParams() {
+        const {queryParamKey, alertTypes, alertTypeKeys} = Constants;
         const queryParams = super.getGlobalState(queryParamKey);
         let alertType = alertTypeKeys.allAlerts;
-        let filterValues = {};
+
         if (queryParams.type) {
             if (alertTypes[queryParams.type]) {
                 alertType = alertTypeKeys[queryParams.type];
             }
         }
+        return {alertType, filterValues: this.getFilterValuesFromQueryParam()};
+    }
+
+    /**
+     * getTimeRangeFromQueryParam returns time range information in query params
+     * */
+    getTimeRangeFromQueryParam() {
+        const {queryParamKey, dateRanges, custom} = Constants;
+        const queryParams = super.getGlobalState(queryParamKey);
+        let result = {};
+
+        if (queryParams.range) {
+            if (queryParams.range.toLowerCase() === custom && queryParams.from && queryParams.to) {
+                result = {range: queryParams.range, from: queryParams.from, to: queryParams.to, sync: false};
+            } else if (dateRanges.indexOf(queryParams.range) !== -1) {
+                if (queryParams.sync !== undefined) {
+                    result = {
+                        range: queryParams.range, from: queryParams.from, to: queryParams.to,
+                        sync: queryParams.sync
+                    };
+                } else {
+                    result = {range: queryParams.range, sync: false};
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * getFilterValuesFromQueryParam get filter values in  query params
+     * */
+    getFilterValuesFromQueryParam() {
+        const {queryParamKey, alertsHistoryTableColumnNames} = Constants;
+        const queryParams = super.getGlobalState(queryParamKey);
+        let filterValues = {};
+
         if (queryParams.filters) {
             let filters = queryParams.filters;
             Object.keys(filters).forEach(column => {
@@ -156,9 +224,14 @@ class APIMAlertsHistory extends Widget {
                 }
             });
         }
-        this.state.alertType = alertType;
-        this.state.filterValues = filterValues;
-        this.setQueryParam();
+        return filterValues;
+    }
+
+    /**
+     * onChangeSyncTimeRange handle change in time range auto sync
+     * */
+    onChangeSyncTimeRange(syncTimeRange) {
+        this.setState({syncTimeRange}, this.setQueryParam);
     }
 
     /**
@@ -166,6 +239,7 @@ class APIMAlertsHistory extends Widget {
      * */
     capitalizeCaseFirstChar(str) {
         let result = '';
+
         if (str) {
             result = str.charAt(0).toUpperCase() + str.slice(1);
         }
@@ -176,18 +250,41 @@ class APIMAlertsHistory extends Widget {
      * handleDataReceived loads data retrieved to alerts history table
      * */
     handleDataReceived(message) {
+        const {alertTypeKeys, alertTypes, alertTypeNamesMapping, numberOfSeverityLevels} = Constants;
+        const {alertType, filterValues} = this.state;
+
         if (message.data) {
-            let results = [];
-            const {alertType} = this.state;
-            const {alertTypeKeys} = Constants;
+            const results = [];
             if (alertType === alertTypeKeys.allAlerts) {
-                results = this.createTableDataForAllAlerts(message.data);
+                message.data.forEach(dataUnit => {
+                    const row = {};
+                    row.timestamp = dataUnit[0];
+                    row.type = alertTypeNamesMapping[dataUnit[1]];
+                    row.message = dataUnit[3];
+                    // in alerts table severity 1 = severe and 3 = mild. when sorting in the table, asc order should
+                    // be mild-sever. To support this, the severity level indicators are flipped so as to assign
+                    // 1 = mild and 3 = severe
+                    row.severity = numberOfSeverityLevels - (dataUnit[2] - 1);
+                    results.push(row);
+                });
             } else {
-                results = this.createTableDataForSpecificAlerts(alertType, message.data);
+                message.data.forEach(dataUnit => {
+                    const row = {};
+                    row.timestamp = dataUnit[0];
+                    row.type = alertTypes[alertType];
+                    row.message = dataUnit.splice(3);
+                    row.messageSummary = dataUnit[2];
+                    // in alerts table severity 1 = severe and 3 = mild. when sorting in the table, asc order should
+                    // be mild-sever. To support this, the severity level indicators are flipped so as to assign
+                    // 1 = mild and 3 = severe
+                    row.severity = numberOfSeverityLevels - (dataUnit[1] - 1);
+                    results.push(row);
+                });
             }
+            this.alertTableNoDataMessage = 'No alerts history available';
             this.setState({
                 rows: results,
-                filteredRows: this.filterDataUsingAllFilters(results)
+                filteredRows: this.createFilteredAlertHistoryTableData(results, filterValues),
             });
         }
     }
@@ -196,11 +293,11 @@ class APIMAlertsHistory extends Widget {
      * createTableDataForAllAlerts loads data to alerts history table for alert type 'All alerts'
      * */
     createTableDataForAllAlerts(data) {
-        const {alertTypeNamesMapping} = Constants;
         let results = [];
+
         data.forEach(dataUnit => {
-            results.push([Moment(dataUnit[0]).format('YYYY-MMM-DD hh:mm:ss A'),
-                alertTypeNamesMapping[dataUnit[1]], dataUnit[3], this.getSeverityLevel(dataUnit[2])])
+            results.push([Moment(dataUnit.timestamp).format('YYYY-MMM-DD hh:mm:ss A'),
+                dataUnit.type, dataUnit.message, this.getSeverityLevel(dataUnit.severity)])
         });
         return results;
     }
@@ -209,13 +306,14 @@ class APIMAlertsHistory extends Widget {
      * createTableDataForSpecificAlerts loads data to alerts history table for alert type other than 'All alerts'
      * */
     createTableDataForSpecificAlerts(alertType, data) {
-        const {alertTypes, alertMessageFieldsForAlertType} = Constants;
+        const {alertMessageFieldsForAlertType} = Constants;
         let results = [];
+
         data.forEach(dataUnit => {
             const message = this.createAlertMessageElementsForAlerts(this.createAlertMessageKeyValuePairs(
-                alertMessageFieldsForAlertType[alertType], dataUnit.slice(3)), dataUnit[2]);
-            results.push([Moment(dataUnit[0]).format('YYYY-MMM-DD hh:mm:ss A'), alertTypes[alertType],
-                message, this.getSeverityLevel(dataUnit[1])])
+                alertMessageFieldsForAlertType[alertType], dataUnit.message), dataUnit.messageSummary);
+            results.push([Moment(dataUnit.timestamp).format('YYYY-MMM-DD hh:mm:ss A'), dataUnit.type,
+                message, this.getSeverityLevel(dataUnit.severity)])
         });
         return results;
     }
@@ -224,49 +322,37 @@ class APIMAlertsHistory extends Widget {
      * getSeverityLevel return alert severity
      * */
     getSeverityLevel(severity) {
-        let severityLevel = '';
+        let color = '';
+        let text = '';
+
         switch (severity) {
             case 1:
-                severityLevel =
-                    <span style={{
-                        fontWeight: 'bold',
-                        backgroundColor: '#d9534f',
-                        borderRadius: '5px',
-                        padding: '5px',
-                        verticalAlign: 'center'
-                    }}>
-                Severe
-                </span>;
+                color = '#777777';
+                text = <FormattedMessage id='severity.level.mild' defaultMessage='Mild'/>;
                 break;
             case 2:
-                severityLevel =
-                    <span
-                        style={{
-                            fontWeight: 'bold',
-                            backgroundColor: '#f0ad4e',
-                            borderRadius: '5px',
-                            padding: '5px',
-                            verticalAlign: 'center'
-                        }}>
-                Moderate
-                </span>;
+
+                color = '#f0ad4e';
+                text = <FormattedMessage id='severity.level.moderate' defaultMessage='Moderate'/>;
                 break;
             case 3:
-                severityLevel =
-                    <span style={{
-                        fontWeight: 'bold',
-                        backgroundColor: '#777777',
-                        borderRadius: '5px',
-                        padding: '5px',
-                        verticalAlign: 'center'
-                    }}>
-                Mild
-                </span>;
+                color = '#d9534f';
+                text = <FormattedMessage id='severity.level.severe' defaultMessage='Severe'/>;
                 break;
             default:
             //        not reached
         }
-        return severityLevel;
+        return (
+            <span style={{
+                fontWeight: 'bold',
+                backgroundColor: color,
+                borderRadius: '5px',
+                padding: '5px',
+                verticalAlign: 'center'
+            }}>
+                {text}
+            </span>
+        )
     }
 
     /**
@@ -275,6 +361,7 @@ class APIMAlertsHistory extends Widget {
      * */
     createAlertMessageKeyValuePairs(messageFieldNames, messageFieldValues) {
         let result = {};
+
         messageFieldNames.forEach((data, index) => {
             result[data] = messageFieldValues[index];
         });
@@ -296,14 +383,9 @@ class APIMAlertsHistory extends Widget {
         const apiPublisher = data['apiPublisher'];
         const resourceTemplate = data['resourceTemplate'];
         const method = data['method'];
-        const backendTime = data['backendTime'];
-        const requestPerMin = data['requestPerMin'];
-        const reason = data['reason'];
-        const scope = data['scope'];
-        const consumerKey = data['consumerKey'];
         const subscriber = data['subscriber'];
-
         let result = [];
+
         if (userId) {
             result.push(this.getAlertMessageElement(alertMessageFieldNames.userId, userId));
         }
@@ -352,6 +434,9 @@ class APIMAlertsHistory extends Widget {
             </div>);
     }
 
+    /**
+     * getAlertMessageElement creates a single entry in alert message
+     * */
     getAlertMessageElement(elementKey, elementValue) {
         return (
             <div>
@@ -379,6 +464,7 @@ class APIMAlertsHistory extends Widget {
      * */
     handleAlertTypeChange = event => {
         this.state.alertType = event.target.value;
+
         this.setState({
             filteredRows: []
         }, this.fetchAlertData);
@@ -398,20 +484,18 @@ class APIMAlertsHistory extends Widget {
      * */
     getAlertTypeSelector() {
         const {alertTypes, alertTypeKeys} = Constants;
+
         return (
             <FormControl>
-                <InputLabel htmlFor="alert-type">Alert Type</InputLabel>
+                <InputLabel htmlFor='alert-type'>
+                    <FormattedMessage id='alert.type.selector' defaultMessage='Alert Type'/>
+                </InputLabel>
                 <Select
                     value={this.state.alertType}
                     onChange={this.handleAlertTypeChange}
-                    inputProps={{
-                        name: 'Alert Type',
-                        id: 'alert-type',
-                    }}
-                    style={{
-                        width: this.state.width * 0.5 * 0.5
-                    }}>
-                    >
+                    inputProps={{id: 'alert-type',}}
+                    style={{width: this.state.width * 0.5 * 0.5}}
+                >
                     <MenuItem value={alertTypeKeys.allAlerts}>
                         {alertTypes.allAlerts}
                     </MenuItem>
@@ -448,231 +532,42 @@ class APIMAlertsHistory extends Widget {
     }
 
     /**
-     * getAlertFilter returns a popover containing filter details
+     * onDeleteAllFilters handle deletion of all filters
      * */
-    getAlertFilter() {
-        const {openFilterConfig, filterConfigAnchorEl, rows, filterValues} = this.state;
-        const {muiTheme} = this.props;
-        const {filterTableColumnNames} = Constants;
-        return (
-            <div
-                style={{textAlign: 'right'}}>
-                <IconButton
-                    onClick={this.handleFilterClick}
-                    style={{textAlign: 'right'}}
-                >
-                    <Search/>
-                </IconButton>
-                <Popover
-                    open={openFilterConfig}
-                    anchorEl={filterConfigAnchorEl}
-                    anchorOrigin={{
-                        vertical: 'bottom',
-                        horizontal: 'right',
-                    }}
-                    transformOrigin={{
-                        vertical: 'top',
-                        horizontal: 'right',
-                    }}
-                    onClose={this.handleRequestClose}
-                >
-                    <div
-                        style={{padding: 15}}>
-                        {this.createNewAlertFilter()}
-                        <div
-                            style={{paddingTop: 10}}>
-                            <CustomTable
-                                tableColumnNames={filterTableColumnNames}
-                                data={this.createFilterTableData()}
-                                theme={muiTheme}
-                                requirePagination={false}
-                                noDataMessage='No filters available'
-                            />
-                        </div>
-                        {Object.keys(filterValues).length > 0
-                        && (
-                            <div style={{textAlign: 'right'}}>
-                                <IconButton
-                                    onClick={() => {
-                                        this.setState({
-                                            filterValues: {},
-                                            filteredRows: rows,
-                                            invalidFilter: false
-                                        }, this.setQueryParam)
-                                    }}
-                                    style={{color: '#dc3545'}}
-                                >
-                                    <ClearAll/>
-                                </IconButton>
-                            </div>
-                        )}
-                    </div>
-                </Popover>
-            </div>
-        );
-    }
+    onDeleteAllFilters() {
+        const {rows} = this.state;
 
-    /**
-     * handleFilterClick opens the filter detail popover
-     * */
-    handleFilterClick(event) {
-        event.preventDefault();
         this.setState({
-            openFilterConfig: true,
-            filterConfigAnchorEl: event.currentTarget,
-        });
-    }
+            filterValues: {},
+            filteredRows: this.createAlertHistoryTableData(rows),
+        }, this.setQueryParam)
+    };
 
     /**
-     * handleRequestClose closes the filter detail popover
+     * onAddOrDeleteFilter handle additions or deletion of a filter
      * */
-    handleRequestClose() {
-        this.setState({
-            openFilterConfig: false,
-        });
-    }
+    onAddOrDeleteFilter(filterValues) {
+        const {rows} = this.state;
 
-    /**
-     * createNewAlertFilter provide configurations to add a new filter
-     * */
-    createNewAlertFilter() {
-        const {alertsHistoryTableColumnNames} = Constants;
-        const {invalidFilter, newFilterColumn, newFilterValue, width} = this.state;
-        return (
-            <div
-                style={{display: 'flex'}}>
-                <div>
-                    <Select
-                        value={newFilterColumn}
-                        onChange={(event) => {
-                            this.setState({newFilterColumn: event.target.value})
-                        }}
-                        style={{width: width * 0.5 * 0.2}}
-                    >
-                        {alertsHistoryTableColumnNames.map(column => {
-                            return (
-                                <MenuItem value={column.toLowerCase()}>
-                                    {column}
-                                </MenuItem>
-                            )
-                        })}
-                    </Select>
-                    <TextField
-                        placeholder='Filter by'
-                        value={newFilterValue}
-                        onChange={event => {
-                            this.setState({newFilterValue: event.target.value}, this.validateNewFilter);
-                        }}
-                        style={{
-                            width: width * 0.5 * 0.3,
-                            paddingLeft: 10
-                        }}
-                        error={invalidFilter}
-                        helperText={invalidFilter ? 'Filter already exists' : ''}
-                    />
-                </div>
-                <div
-                    style={{
-                        paddingLeft: 10
-                    }}
-                >
-                    <IconButton
-                        style={{
-                            backgroundColor: (invalidFilter || newFilterValue.length === 0) ?
-                                'transparent' : '#F26621'
-                        }}
-                        disabled={invalidFilter || newFilterValue.length === 0}
-                        onClick={this.addFilter}
-                    >
-                        <Add/>
-                    </IconButton>
-                </div>
-            </div>
-        )
-    }
-
-    /**
-     * validateNewFilter check whether the filter already exists
-     * */
-    validateNewFilter() {
-        let {filterValues, newFilterColumn, newFilterValue} = this.state;
-        if (filterValues[newFilterColumn] && filterValues[newFilterColumn].indexOf(newFilterValue) !== -1) {
-            this.setState({invalidFilter: true});
-        } else {
-            this.setState({invalidFilter: false});
-        }
-    }
-
-    /**
-     * addFilter adds a new filter
-     * */
-    addFilter() {
-        let {filterValues, newFilterColumn, newFilterValue, filteredRows} = this.state;
-        if (filterValues[newFilterColumn]) {
-            let filters = filterValues[newFilterColumn];
-            filters.push(newFilterValue);
-            filterValues[newFilterColumn] = filters;
-        } else {
-            filterValues[newFilterColumn] = [newFilterValue];
-        }
-        filteredRows = this.filterDataUsingSingleFilter(filteredRows, newFilterColumn, newFilterValue);
         this.setState({
             filterValues,
-            newFilterValue: '',
-            filteredRows
+            filteredRows: this.createFilteredAlertHistoryTableData(rows, filterValues)
         }, this.setQueryParam);
     }
 
     /**
-     * filterDataUsingSingleFilter data using a single filter
+     * createFilteredAlertHistoryTableData creates the filtered data for alerts history table
      * */
-    filterDataUsingSingleFilter(data, filterColumn, filterValue) {
-        let filterResults = [];
-        const {alertsHistoryTableColumnNames, message, severity, alertTypeKeys} = Constants;
-        const {alertType} = this.state;
-        const index = alertsHistoryTableColumnNames.indexOf(this.capitalizeCaseFirstChar(filterColumn));
-        if (index !== -1) {
-            if (alertType === alertTypeKeys.allAlerts) {
-                data.forEach(dataUnit => {
-                    if (filterColumn === severity && dataUnit[index].props.children.toString().toLowerCase()
-                        .includes(filterValue.toString().toLowerCase())) {
-                        filterResults.push(dataUnit);
-                    } else if (dataUnit[index].toString().toLowerCase().includes(
-                        filterValue.toString().toLowerCase())) {
-                        filterResults.push(dataUnit);
-                    }
-                })
-            } else {
-                data.forEach(dataUnit => {
-                    if (filterColumn === message) {
-                        if (dataUnit[index].props.children.some(child =>
-                            child && (child.props.children.props.children[0].props.children.toString().toLowerCase()
-                                .includes(filterValue.toString().toLowerCase())
-                            || child.props.children.props.children[2].toString().toLowerCase()
-                                .includes(filterValue.toString().toLowerCase())))) {
-                            filterResults.push(dataUnit);
-                        }
-                    } else if (filterColumn === severity && dataUnit[index].props.children.toString().toLowerCase()
-                        .includes(filterValue.toString().toLowerCase())) {
-                        filterResults.push(dataUnit);
-                    } else if (dataUnit[index].toString().toLowerCase()
-                        .includes(filterValue.toString().toLowerCase())) {
-                        filterResults.push(dataUnit);
-                    }
-                })
-            }
-        } else {
-            filterResults = data;
-        }
-        return filterResults;
+    createFilteredAlertHistoryTableData(data, filterValues) {
+        return this.createAlertHistoryTableData(this.filterDataUsingAllFilters(data, filterValues));
     }
 
     /**
-     * filterDataUsingAllFilters filter data using all filters
+     * filterDataUsingAllFilters filter data using given filters
      * */
-    filterDataUsingAllFilters(data) {
-        const {filterValues} = this.state;
+    filterDataUsingAllFilters(data, filterValues) {
         let filteredRows = data;
+
         Object.keys(filterValues).forEach(column => {
             filterValues[column].forEach(value => {
                 filteredRows = this.filterDataUsingSingleFilter(filteredRows, column, value);
@@ -682,49 +577,120 @@ class APIMAlertsHistory extends Widget {
     }
 
     /**
-     * createFilterTableData display the filters in a table
+     * filterDataUsingSingleFilter data using a single filter
      * */
-    createFilterTableData() {
-        const {filterValues, rows} = this.state;
-        let filterData = [];
-        Object.keys(filterValues).forEach(column => {
-            filterValues[column].forEach(value => {
-                filterData.push([column, value,
-                    <IconButton
-                        onClick={() => {
-                            let filtersForColumn = filterValues[column];
-                            const index = filtersForColumn.indexOf(value);
-                            filtersForColumn.splice(index, 1);
-                            if (filtersForColumn.length > 0) {
-                                filterValues[column] = filtersForColumn;
-                            } else {
-                                delete filterValues[column];
-                            }
-                            const filteredRows = this.filterDataUsingAllFilters(rows);
-                            this.setState({filterValues, filteredRows}, this.setQueryParam);
-                        }}
-                        style={{color: '#dc3545'}}
-                    >
-                        <Delete/>
-                    </IconButton>]);
+    filterDataUsingSingleFilter(data, filterColumn, filterValue) {
+        let filterResults = [];
+        const {alertsHistoryTableColumnNames, alertTypeKeys, timestamp, severity, message, messageSummary} = Constants;
+        const {alertType} = this.state;
+
+        if (alertsHistoryTableColumnNames.indexOf(this.capitalizeCaseFirstChar(filterColumn)) !== -1) {
+            data.forEach(dataUnit => {
+                if (alertType !== alertTypeKeys.allAlerts && filterColumn === message) {
+                    if (dataUnit[filterColumn].some(dataUnit => dataUnit.toString().toLowerCase().includes(
+                        filterValue.toString().toLowerCase()))) {
+                        filterResults.push(dataUnit);
+                    } else if (dataUnit[messageSummary].toString().toLowerCase().includes(
+                        filterValue.toString().toLowerCase())) {
+                        filterResults.push(dataUnit);
+                    }
+                } else if (filterColumn === timestamp) {
+                    if (Moment(dataUnit[filterColumn]).format('YYYY-MMM-DD hh:mm:ss A').toLowerCase().includes(
+                        filterValue.toString().toLowerCase())) {
+                        filterResults.push(dataUnit);
+                    }
+                } else if (filterColumn === severity) {
+                    let severity = '';
+                    switch (dataUnit[filterColumn]) {
+                        case 1:
+                            severity = 'mild';
+                            break;
+                        case 2:
+                            severity = 'moderate';
+                            break;
+                        case 3:
+                            severity = 'severe';
+                            break;
+                    }
+                    if (severity.includes(filterValue.toString().toLowerCase())) {
+                        filterResults.push(dataUnit);
+                    }
+                } else {
+                    if (dataUnit[filterColumn].toString().toLowerCase().includes(
+                        filterValue.toString().toLowerCase())) {
+                        filterResults.push(dataUnit);
+                    }
+                }
             })
-        });
-        return filterData;
+        } else {
+            filterResults = data;
+        }
+        return filterResults;
+    }
+
+    /**
+     * createAlertHistoryTableData creates data for alerts table history
+     * */
+    createAlertHistoryTableData(data) {
+        const {alertType} = this.state;
+        const {alertTypeKeys} = Constants;
+        let tableRows = [];
+
+        if (alertType === alertTypeKeys.allAlerts) {
+            tableRows = this.createTableDataForAllAlerts(data);
+        } else {
+            tableRows = this.createTableDataForSpecificAlerts(alertType, data);
+        }
+        return tableRows;
     }
 
     /**
      * setQueryParam set alert type and filters as query params
      * */
     setQueryParam() {
-        const {queryParamKey} = Constants;
-        const {alertType, filterValues} = this.state;
+        const {queryParamKey, custom} = Constants;
+        const {alertType, filterValues, selectedTimeRange, timeTo, timeFrom, syncTimeRange} = this.state;
+        let queryParams = {type: alertType};
+
         if (Object.keys(filterValues).length > 0) {
-            super.setGlobalState(queryParamKey, {
-                type: alertType,
-                filters: filterValues,
-            });
+            queryParams.filters = filterValues;
+        }
+        if (selectedTimeRange) {
+            queryParams.range = selectedTimeRange;
+            if (selectedTimeRange === custom) {
+                queryParams.from = Moment(timeFrom).format('YYYY-MMM-DD hh:mm:ss A').toLowerCase();
+                queryParams.to = Moment(timeTo).format('YYYY-MMM-DD hh:mm:ss A').toLowerCase();
+            } else {
+                queryParams.sync = syncTimeRange;
+            }
+        }
+        super.setGlobalState(queryParamKey, queryParams);
+    }
+
+    /**
+     * handleRequestSort handle on click of sort in alerts table
+     * */
+    handleRequestSort(orderBy, order) {
+        let {rows, filterValues} = this.state;
+
+        rows = this.filterDataUsingAllFilters(rows, filterValues);
+        const filteredRows = this.createAlertHistoryTableData(this.sort(rows, orderBy, order));
+        this.setState({rows, filteredRows});
+    };
+
+
+    /**
+     * sort data in the specified order of specified column
+     * */
+    sort(data, column, sortOrder) {
+        const {sortAscending} = Constants;
+
+        if (sortOrder === sortAscending) {
+            return data.sort((a, b) => a[column.toLowerCase()].toString().localeCompare(
+                b[column.toLowerCase()].toString(), undefined, {numeric: true, sensitivity: 'base'}));
         } else {
-            super.setGlobalState(queryParamKey, {type: alertType});
+            return data.sort((a, b) => b[column.toLowerCase()].toString().localeCompare(
+                a[column.toLowerCase()].toString(), undefined, {numeric: true, sensitivity: 'base'}));
         }
     }
 
@@ -732,54 +698,90 @@ class APIMAlertsHistory extends Widget {
      * render the alerts history table
      * */
     render() {
-        const {alertsHistoryTableColumnNames} = Constants;
-        const {width, filteredRows} = this.state;
+        if (this.state.faultyProviderConf) {
+            return (
+                <div
+                    style={{
+                        padding: 24,
+                    }}
+                >
+                    <FormattedMessage
+                        id='faulty.provider.config.error.message'
+                        defaultMessage='Cannot fetch provider configuration for API-M Alerts History widget.'/>
+                </div>
+            );
+        }
+
+        const {
+            alertsHistoryTableColumnNames, alertsHistoryTableSortColumns, alertsHistoryHeaderWidthSpec,
+            alertsHistoryHeaderMinWidthSpec, alertsTableSelectedRowsPerPageIndex
+        } = Constants;
+        const {width, options, filteredRows, localeMessages} = this.state;
         const {muiTheme} = this.props;
+
         return (
-            <MuiThemeProvider
-                theme={this.props.muiTheme.name === 'dark' ? darkTheme : lightTheme}>
-                <Scrollbars
-                    style={{height: this.state.height}}>
-                    <div
-                        style={{
-                            paddingTop: 10,
-                            paddingBottom: 10,
-                            paddingLeft: 5,
-                            paddingRight: 5,
-                        }}
-                    >
+            <IntlProvider locale={language} messages={localeMessages}>
+                <MuiThemeProvider
+                    theme={this.props.muiTheme.name === 'dark' ? darkTheme : lightTheme}>
+                    <Scrollbars
+                        style={{height: this.state.height}}
+                        horizontal={false}>
                         <div
                             style={{
-                                display: 'flex',
-                                paddingBottom: 20,
-                                paddingLeft: 15,
-                                paddingRight: 15,
+                                paddingTop: 10,
+                                paddingBottom: 10,
+                                paddingLeft: 5,
+                                paddingRight: 5,
                             }}
                         >
                             <div
                                 style={{
-                                    width: width * 0.5
-                                }}>
-                                {this.getAlertTypeSelector()}
+                                    display: 'flex',
+                                    paddingBottom: 20,
+                                    paddingLeft: 15,
+                                    paddingRight: 15,
+                                }}
+                            >
+                                <div>
+                                    {this.getAlertTypeSelector()}
+                                </div>
+                                <div
+                                    style={{
+                                        paddingTop: 15,
+                                        display: 'flex',
+                                        marginLeft: 'auto',
+                                        marginRight: 0
+                                    }}>
+                                    <DateRangePicker
+                                        options={options}
+                                        onChangeTime={this.onChangeTime}
+                                        getTimeRangeInfo={this.getTimeRangeFromQueryParam}
+                                        muiTheme={muiTheme}
+                                        onChangeSyncTimeRange={this.onChangeSyncTimeRange}/>
+                                    <AlertsFilter
+                                        muiTheme={muiTheme}
+                                        onDeleteAllFilters={this.onDeleteAllFilters}
+                                        onAddOrDeleteFilter={this.onAddOrDeleteFilter}
+                                        initFilterValues={this.initFilterValues}/>
+                                </div>
                             </div>
-                            <div
-                                style={{
-                                    width: width * 0.5,
-                                    paddingTop: 15
-                                }}>
-                                {this.getAlertFilter()}
-                            </div>
+                            <CustomTable
+                                tableColumnNames={alertsHistoryTableColumnNames}
+                                data={filteredRows}
+                                theme={muiTheme}
+                                requirePagination={true}
+                                sortColumns={alertsHistoryTableSortColumns}
+                                onRequestSort={this.handleRequestSort}
+                                widthSpec={alertsHistoryHeaderWidthSpec}
+                                minWidthSpec={alertsHistoryHeaderMinWidthSpec}
+                                width={width}
+                                selectedRowsPerPageIndex={alertsTableSelectedRowsPerPageIndex}
+                                noDataMessage={this.alertTableNoDataMessage}
+                            />
                         </div>
-                        <CustomTable
-                            tableColumnNames={alertsHistoryTableColumnNames}
-                            data={filteredRows}
-                            theme={muiTheme}
-                            requirePagination={true}
-                        />
-                    </div>
-                </Scrollbars>
-            </MuiThemeProvider>
-        );
+                    </Scrollbars>
+                </MuiThemeProvider>
+            </IntlProvider>);
     }
 }
 

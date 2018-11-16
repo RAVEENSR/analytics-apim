@@ -23,6 +23,7 @@ import FirstPageIcon from '@material-ui/icons/FirstPage';
 import KeyboardArrowLeft from '@material-ui/icons/KeyboardArrowLeft';
 import KeyboardArrowRight from '@material-ui/icons/KeyboardArrowRight';
 import LastPageIcon from '@material-ui/icons/LastPage';
+import {FormattedMessage} from "react-intl";
 
 export default class CustomTablePaginationAction extends React.Component {
     constructor(props) {
@@ -69,10 +70,11 @@ export default class CustomTablePaginationAction extends React.Component {
      * handleSelectedPageChange handle changes in selected page
      * */
     handleSelectedPageChange = event => {
+        const  { count, rowsPerPage, onChangePage } = this.props;
         if (event.target.value !== '') {
             let page = 0;
             if (event.target.value > 0) {
-                const maxPage = Math.ceil(this.props.count / this.props.rowsPerPage);
+                const maxPage = Math.ceil(count / rowsPerPage);
                 if (event.target.value > maxPage) {
                     page = maxPage - 1;
                 } else {
@@ -80,7 +82,7 @@ export default class CustomTablePaginationAction extends React.Component {
                 }
             }
             this.setState({selectedPage: page + 1});
-            this.props.onChangePage(event, page);
+            onChangePage(event, page);
         } else {
             this.setState({selectedPage: ''});
         }
@@ -90,18 +92,29 @@ export default class CustomTablePaginationAction extends React.Component {
      * verifySelectedPageNumber check whether the selected page is valid
      * */
     verifySelectedPageNumber() {
-        const {count, rowsPerPage} = this.props;
+        const { count, rowsPerPage } = this.props;
+        const { selectedPage } = this.state;
         if (count === 0
-            && this.state.selectedPage > 0) {
+            && selectedPage > 0) {
             this.setState({selectedPage: 0});
-        } else if ((this.state.selectedPage === 0 && count > 0)
-            || this.state.selectedPage > Math.ceil(count / rowsPerPage)) {
+        } else if ((selectedPage === 0 && count > 0)
+            || selectedPage > Math.ceil(count / rowsPerPage)) {
             this.setState({selectedPage: 1});
+        }
+    }
+
+    /**
+     * handleSelectedPageBlur handle empty selected page on blur of textfield
+     * */
+    handleSelectedPageBlur() {
+        if (this.state.selectedPage === '') {
+            this.setState({selectedPage: this.props.page+1});
         }
     }
 
     render() {
         const {count, page, rowsPerPage} = this.props;
+        const { selectedPage } = this.state;
         this.verifySelectedPageNumber();
 
         return (
@@ -119,9 +132,10 @@ export default class CustomTablePaginationAction extends React.Component {
                                 textAlign: 'right',
                                 width: 'max-content'
                             },
-                            min: 0
+                            min: 0,
+                            onBlur:() => {this.handleSelectedPageBlur()}
                         }}
-                        value={this.state.selectedPage}
+                        value={selectedPage}
                         type='number'
                         onChange={this.handleSelectedPageChange}
                     />
@@ -132,34 +146,32 @@ export default class CustomTablePaginationAction extends React.Component {
                         width: 'max-content'
                     }}
                     >
-                        of {Math.ceil(count / rowsPerPage)} Page(s)
+                        <FormattedMessage id='tooltip.table.pagination.of' defaultMessage='of '/>
+                        {Math.ceil(count / rowsPerPage)}
+                        <FormattedMessage id='tooltip.table.pagination.pages' defaultMessage=' Page(s)'/>
                     </div>
                 </div>
                 <IconButton
                     onClick={this.handleFirstPageButtonClick}
                     disabled={page === 0}
-                    aria-label="First Page"
                 >
                     <FirstPageIcon/>
                 </IconButton>
                 <IconButton
                     onClick={this.handleBackButtonClick}
                     disabled={page === 0}
-                    aria-label="Previous Page"
                 >
                     <KeyboardArrowLeft/>
                 </IconButton>
                 <IconButton
                     onClick={this.handleNextButtonClick}
                     disabled={page >= Math.ceil(count / rowsPerPage) - 1}
-                    aria-label="Next Page"
                 >
                     <KeyboardArrowRight/>
                 </IconButton>
                 <IconButton
                     onClick={this.handleLastPageButtonClick}
                     disabled={page >= Math.ceil(count / rowsPerPage) - 1}
-                    aria-label="Last Page"
                 >
                     <LastPageIcon/>
                 </IconButton>

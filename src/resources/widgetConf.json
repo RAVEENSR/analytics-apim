@@ -3,11 +3,6 @@
     "id": "APIMAlertsHistory",
     "thumbnailURL": "",
     "configs": {
-      "pubsub": {
-        "types": [
-          "subscriber"
-        ]
-      },
       "providerConfig" : {
         "configs": {
             "type": "SiddhiStoreDataProvider",
@@ -21,14 +16,54 @@
                   "queryApimRequestPatternChangedAlert": "from ApimRequestPatternChangedAlert on alertTimestamp >= '{{timeFrom}}' AND alertTimestamp <= '{{timeTo}}' select alertTimestamp, severity, message, username, applicationName, applicationOwner order by alertTimestamp desc;",
                   "queryApimIPAccessAbnormalityAlert": "from ApimIPAccessAbnormalityAlert on alertTimestamp >= '{{timeFrom}}' AND alertTimestamp <= '{{timeTo}}' select alertTimestamp, severity, message, ip, applicationName, applicationOwner, username order by alertTimestamp desc;",
                   "queryApimTierLimitHittingAlert": "from ApimTierLimitHittingAlert on alertTimestamp >= '{{timeFrom}}' AND alertTimestamp <= '{{timeTo}}' select alertTimestamp, severity, message, subscriber, apiCreator, apiName, applicationId, applicationName order by alertTimestamp desc;",
-                  "queryApimApiHealthMonitorAlert": "from ApimApiHealthMonitorAlert select alertTimestamp, severity, message, apiName, apiVersion, apiCreator;"
+                  "queryApimApiHealthMonitorAlert": "from ApimApiHealthMonitorAlert on alertTimestamp >= '{{timeFrom}}' AND alertTimestamp <= '{{timeTo}}' select alertTimestamp, severity, message, apiName, apiVersion, apiCreator;"
                 },
                 "publishingInterval": 60
             }
-        }   
-      
-      }
-     
+        }
+      },
+      "options": [
+        {
+          "id": "header",
+          "title": "Header",
+          "type": {
+            "name": "BOOLEAN",
+            "possibleValues": [
+              true,
+              false
+            ]
+          },
+          "defaultValue": true
+        },
+        {
+          "id": "defaultRange",
+          "title": "Default Range",
+          "type": {
+            "name": "ENUM",
+            "possibleValues": [
+              "1 Min",
+              "15 Min",
+              "1 Hour",
+              "1 Day",
+              "1 Week",
+              "2 Weeks",
+              "1 Month",
+              "3 Months",
+              "6 Months",
+              "1 Year"
+            ]
+          },
+          "defaultValue": "1 Week"
+        },
+        {
+          "id": "autoSyncInterval",
+          "title": "Auto-Sync Interval (Seconds)",
+          "type": {
+            "name": "TEXT"
+          },
+          "defaultValue": "60"
+        }
+      ]
 	}
 }
 

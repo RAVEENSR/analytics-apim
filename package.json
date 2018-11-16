@@ -10,6 +10,7 @@
         "react": "^16.4.0",
         "react-custom-scrollbars": "^4.2.1",
         "react-dom": "^16.4.0",
+        "react-intl": "^2.7.2",
         "rimraf": "^2.6.2"
     },
     "scripts": {
@@ -22,6 +23,7 @@
         "build-dev": "webpack -d --config webpack.config.js --watch --progress"
     },
     "devDependencies": {
+        "axios": "^0.16.2",
         "babel-core": "^6.25.0",
         "babel-loader": "^7.1.1",
         "babel-preset-env": "^1.6.1",
@@ -32,6 +34,13 @@
         "copy-webpack-plugin": "^4.2.0",
         "css-loader": "^0.28.9",
         "style-loader": "^0.20.2",
-        "webpack": "^3.12.0"
+        "webpack": "^3.12.0",
+        "eslint": "^5.4.0",
+        "eslint-config-airbnb": "^17.1.0",
+        "eslint-loader": "^2.1.0",
+        "eslint-plugin-import": "^2.7.0",
+        "eslint-plugin-jsx-a11y": "^6.1.1",
+        "eslint-plugin-react": "^7.1.0",
+        "babel-eslint": "^8.2.6"
     }
 }

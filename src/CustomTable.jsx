@@ -24,20 +24,29 @@ import TableCell from '@material-ui/core/TableCell';
 import TableFooter from '@material-ui/core/TableFooter';
 import TablePagination from '@material-ui/core/TablePagination';
 import TableRow from '@material-ui/core/TableRow';
+import TableSortLabel from "@material-ui/core/TableSortLabel";
+import Tooltip from "@material-ui/core/Tooltip";
 import Paper from '@material-ui/core/Paper';
+import Sort from '@material-ui/icons/Sort';
+import {FormattedMessage} from 'react-intl';
 import TablePaginationAction from './CustomTablePaginationAction';
+import Constants from "./Constants";
 
 export default class CustomTable extends React.Component {
     constructor(props) {
+        const { tablePaginationRowsPerPageOptions } = Constants;
         super(props);
-
         this.state = {
+            order: 'desc',
+            orderBy: '',
             tableColumnNames: this.props.tableColumnNames,
+            sortColumns: this.props.sortColumns,
             rows: this.props.data,
             page: 0,
-            rowsPerPage: 5,
-            noDataMessage: this.props.noDataMessage || 'No results available',
-            requirePagination: this.props.requirePagination || false
+            rowsPerPage: tablePaginationRowsPerPageOptions[this.props.selectedRowsPerPageIndex || 0],
+            noDataMessage: this.props.noDataMessage ||
+                <FormattedMessage id='table.no.results.available' defaultMessage='No results available'/>,
+            requirePagination: this.props.requirePagination || false,
         };
     }
 
@@ -67,30 +76,103 @@ export default class CustomTable extends React.Component {
     }
 
     /**
+     * getTableHeader returns the column headers of the table
+     * x*/
+    getTableHeader() {
+        const { order, orderBy, tableColumnNames, sortColumns } = this.state;
+        const { theme, widthSpec, minWidthSpec, width } = this.props;
+
+        return (
+            <TableRow>
+                {tableColumnNames.map(header => {
+                    //user can specify the min width for a specific column by absolute and relative(%) terms.
+                    // the min of the two is set as column width
+                    let minWidth = '';
+                    if(widthSpec && widthSpec[header] && minWidthSpec && minWidthSpec[header]) {
+                        minWidth = Math.min(widthSpec[header], width * minWidthSpec[header])
+                    }
+                    if (sortColumns && sortColumns.indexOf(header) !== -1) {
+                        return (
+                            <TableCell
+                                key={header}
+                                sortDirection={orderBy === header ? order : false}
+                                style={{
+                                    background: theme.name === 'dark' ? '#2f2f31' : '#DCDCDC',
+                                    minWidth: minWidth
+                                }}
+                            >
+                                <Tooltip
+                                    title={(orderBy !== header || order === 'desc') ?
+                                        <FormattedMessage
+                                            id='tooltip.table.sort.asc' defaultMessage='Sort Ascending'/> :
+                                        <FormattedMessage
+                                            id='tooltip.table.sort.desc' defaultMessage='Sort Descending'/>
+                                    }
+                                    enterDelay={200}
+                                    placement='right-end'
+                                >
+                                    <TableSortLabel
+                                        active={orderBy === header}
+                                        direction={order}
+                                        onClick={this.createSortHandler(header)}
+                                        IconComponent={Sort}
+                                    >
+                                        {header}
+                                    </TableSortLabel>
+                                </Tooltip>
+                            </TableCell>
+                        );
+                    } else {
+                        return (
+                            <TableCell
+                                style={{
+                                    background: theme.name === 'dark' ?
+                                        '#2f2f31' : '#DCDCDC',
+                                    minWidth: minWidth
+                                }}
+                            >
+                                {header}
+                            </TableCell>
+                        );
+                    }
+                })}
+            </TableRow>
+        );
+    }
+
+    /**
+     * createSortHandler creates a sort handler for selected column
+     * */
+    createSortHandler = property => event => {
+        const { sortAscending, sortDescending } = Constants;
+        const orderBy = property;
+        let order = sortAscending;
+
+        if (this.state.orderBy === property && this.state.order === sortAscending) {
+            order = sortDescending;
+        }
+        this.props.onRequestSort(orderBy, order);
+        this.setState({order, orderBy});
+
+    };
+
+    /**
      * render custom table
      * */
     render() {
         this.state.rows = this.props.data;
-        const {rows, rowsPerPage, page, tableColumnNames, noDataMessage, requirePagination} = this.state;
+        const {rows, rowsPerPage, page, tableColumnNames, requirePagination} = this.state;
+        let { noDataMessage} = this.state;
+        noDataMessage = this.props.noDataMessage || noDataMessage;
+        const { tablePaginationRowsPerPageOptions } = Constants;
         const emptyRows = this.getEmptyRowsNumber(rows.length, rowsPerPage, page);
+
         return (
             <Paper>
                 <div>
-                    <Table id='abs'>
+                    <Table>
                         <TableHead>
-                            <TableRow>
-                                {tableColumnNames.map((header) => {
-                                    return (
-                                        <TableCell
-                                            style={{
-                                                background: this.props.theme.name === 'dark' ?
-                                                    '#2f2f31' : '#DCDCDC'
-                                            }}>
-                                            {header}
-                                        </TableCell>
-                                    );
-                                })}
-                            </TableRow>
+                            {this.getTableHeader()}
                         </TableHead>
                         {rows.length > 0 ?
                             (<TableBody>
@@ -115,7 +197,7 @@ export default class CustomTable extends React.Component {
                             </TableBody>) :
                             (<TableBody>
                                 <TableRow
-                                    style={{height: 48 * 3}}>
+                                    style={{height: 48 * rowsPerPage}}>
                                     <TableCell
                                         colspan={tableColumnNames.length}
                                         style={{
@@ -135,7 +217,7 @@ export default class CustomTable extends React.Component {
                                         colSpan={3}
                                         count={rows.length}
                                         rowsPerPage={rowsPerPage}
-                                        rowsPerPageOptions={[5, 10, 25, 50, 100]}
+                                        rowsPerPageOptions={tablePaginationRowsPerPageOptions}
                                         page={page}
                                         onChangePage={this.handleChangePage}
                                         onChangeRowsPerPage={this.handleChangeRowsPerPage}
