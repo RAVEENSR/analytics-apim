@@ -17,6 +17,7 @@
  */
 
 import React from 'react';
+import PropTypes from 'prop-types';
 import Tooltip from "@material-ui/core/Tooltip";
 import {FormattedMessage} from "react-intl";
 import IconButton from "@material-ui/core/IconButton";
@@ -102,8 +103,8 @@ export default class AlertsFilter extends React.Component {
                     <Tooltip
                         title={this.getTooltipForAddFilter()}>
                         <TextField
-                            placeholder='Filter by'
-                            // placeholder={<FormattedMessage id='filter.by' defaultMessage='Filter by'/>}
+                            placeholder={this.context.intl
+                                .formatMessage({id: 'filter.by', defaultMessage: 'Filter by'})}
                             value={this.newFilterValue}
                             onChange={event => {
                                 this.newFilterValue = event.target.value;
@@ -346,3 +347,8 @@ export default class AlertsFilter extends React.Component {
         );
     }
 }
+
+AlertsFilter.contextTypes ={
+    intl: PropTypes.object.isRequired
+};
+
