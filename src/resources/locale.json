@@ -27,11 +27,13 @@
     "tooltip.date.range.picker.custom": "Add custom time range",
     "tooltip.date.range.picker.low.granularity.options": "See lower order time range options",
     "tooltip.date.range.picker.high.granularity.options": "See higher order time range options",
+    "tooltip.date.range.picker.all" : "Show all alerts history",
     "date.range.picker.custom": "Custom",
     "date.range.picker.from": "From",
     "date.range.picker.to" : "To",
     "date.range.picker.apply" : "Apply",
     "date.range.picker.time": "Time",
-    "date.range.picker.invalid.time.range": "Invalid date range, Please select a valid date range."
+    "date.range.picker.invalid.time.range": "Invalid date range, Please select a valid date range.",
+    "date.range.picker.all": "All"
   }
 }

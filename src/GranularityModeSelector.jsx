@@ -69,7 +69,8 @@ export default class GranularityModeSelector extends React.Component {
                         onClick={this.handleClick}
                         style={{
                             borderBottom: theme.name === 'dark' ? '1px solid red' : '1px solid gray',
-                            textTransform: 'none'
+                            textTransform: 'none',
+                            borderRadius: 0
                         }}
                     >
                         <FormattedMessage id='date.range.picker.custom' defaultMessage='Custom'/>

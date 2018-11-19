@@ -80,7 +80,7 @@ class APIMAlertsHistory extends Widget {
             syncTimeRange: false
         };
         this.alertTableNoDataMessage = 'No alerts history available';
-        this.initFilterValues={};
+        this.initFilterValues = {};
 
         this.props.glContainer.on('resize', () =>
             this.setState({
@@ -90,13 +90,16 @@ class APIMAlertsHistory extends Widget {
         );
 
         this.handleDataReceived = this.handleDataReceived.bind(this);
-        this.handleTableUpdate = this.handleTableUpdate.bind(this);
+        this.initAlertsHistoryTable = this.initAlertsHistoryTable.bind(this);
         this.getSeverityLevel = this.getSeverityLevel.bind(this);
         this.getAlertTypeSelector = this.getAlertTypeSelector.bind(this);
         this.capitalizeCaseFirstChar = this.capitalizeCaseFirstChar.bind(this);
         this.filterDataUsingAllFilters = this.filterDataUsingAllFilters.bind(this);
         this.handleRequestSort = this.handleRequestSort.bind(this);
         this.onChangeTime = this.onChangeTime.bind(this);
+        this.onClickSelectAll = this.onClickSelectAll.bind(this);
+        this.retrieveAlertsHistory = this.retrieveAlertsHistory.bind(this);
+        this.retrieveAllAlertsHistory = this.retrieveAllAlertsHistory.bind(this);
         this.getTimeRangeFromQueryParam = this.getTimeRangeFromQueryParam.bind(this);
         this.onChangeSyncTimeRange = this.onChangeSyncTimeRange.bind(this);
         this.onDeleteAllFilters = this.onDeleteAllFilters.bind(this);
@@ -115,13 +118,13 @@ class APIMAlertsHistory extends Widget {
         const locale = (languageWithoutRegionCode || language || 'en');
 
         this.setState({localeMessages: defineMessages(localeJSON[locale]) || {}});
-        this.initFilterValues =this.getFilterValuesFromQueryParam();
+        this.initFilterValues = this.getFilterValuesFromQueryParam();
         super.getWidgetConfiguration(this.props.widgetID)
             .then((message) => {
                 this.setState({
                     dataProviderConf: message.data.configs.providerConfig
                 }, () => {
-                    this.handleTableUpdate()
+                    this.initAlertsHistoryTable()
                 });
             })
             .catch(() => {
@@ -135,33 +138,88 @@ class APIMAlertsHistory extends Widget {
      * onChangeTime handles change in selected time range
      * */
     onChangeTime(selectedTimeRange, timeFrom, timeTo) {
+        this.alertTableNoDataMessage = 'Loading alerts history';
+        const {syncTimeRange, filteredRows} = this.state;
         this.setState({
             timeFrom,
             timeTo,
             selectedTimeRange,
-            filteredRows:[]
-        }, this.handleTableUpdate);
+            //if sync is enabled for lower time periods, emptying filtered rows will cause a flicker when
+            // emptying and loading new information, to avoid this empty filtered rows aren't emptied in sync mode
+            filteredRows: syncTimeRange ? filteredRows : []
+        }, this.retrieveAlertsHistory);
+        this.updateQueryParams(null, null, selectedTimeRange, timeFrom, timeTo, syncTimeRange);
+
     }
 
     /**
-     * handleTableUpdate retrieves data from alert tables
+     * onClickSelectAll handles change in selected time range
      * */
-    handleTableUpdate() {
+    onClickSelectAll() {
+        this.alertTableNoDataMessage = 'Loading alerts history';
+        const {all} = Constants;
+
+        this.setState({
+            selectedTimeRange: all,
+            filteredRows: []
+        }, this.retrieveAlertsHistory);
+        this.updateQueryParams(all, null, null, null, null, null);
+
+    }
+
+    /**
+     * initAlertsHistoryTable handle initial load of alerts history after receiving provider config
+     * */
+    initAlertsHistoryTable() {
+        this.alertTableNoDataMessage = 'Loading alerts history';
         const queryParam = this.getQueryParams();
-        const {timeFrom, timeTo, dataProviderConf} = this.state;
+
+        this.setState({
+            alertType: queryParam.alertType,
+            filterValues: queryParam.filterValues,
+        }, this.retrieveAlertsHistory);
+        this.updateQueryParams(queryParam.alertType, queryParam.filterValues, null, null, null, null);
+    }
+
+    /**
+     * retrieveAlertsHistory retrieve alerts history
+     * */
+    retrieveAlertsHistory() {
+        if (this.state.selectedTimeRange === Constants.all) {
+            this.retrieveAllAlertsHistory();
+        } else {
+            this.retrieveAlertsHistoryForTimeRange();
+        }
+    }
+
+    /**
+     * retrieveAlertsHistory retrieve alerts history for given time range
+     * */
+    retrieveAlertsHistoryForTimeRange() {
+        const {timeFrom, timeTo, dataProviderConf, alertType} = this.state;
         const {queryNames} = Constants;
 
         if (dataProviderConf) {
-            let query = dataProviderConf.configs.config.queryData[queryNames[queryParam.alertType]];
+            let query = dataProviderConf.configs.config.queryData[queryNames[alertType]];
             query = query
                 .replace("{{timeFrom}}", timeFrom)
                 .replace("{{timeTo}}", timeTo);
             dataProviderConf.configs.config.queryData.query = query;
-            this.alertTableNoDataMessage = 'Fetching alerts history';
-            this.setState({
-                alertType: queryParam.alertType,
-                filterValues: queryParam.filterValues,
-            }, this.setQueryParam);
+            super.getWidgetChannelManager().subscribeWidget(this.props.id, this.handleDataReceived, dataProviderConf);
+        }
+    }
+
+
+    /**
+     * retrieveAllAlertsHistory handles selection of 'all' option in time range
+     * */
+    retrieveAllAlertsHistory() {
+        const {dataProviderConf, alertType} = this.state;
+        const {queryNamesForSelectAll} = Constants;
+
+        if (dataProviderConf) {
+            dataProviderConf.configs.config.queryData.query = dataProviderConf.configs
+                .config.queryData[queryNamesForSelectAll[alertType]];
             super.getWidgetChannelManager().subscribeWidget(this.props.id, this.handleDataReceived, dataProviderConf);
         }
     }
@@ -179,24 +237,27 @@ class APIMAlertsHistory extends Widget {
                 alertType = alertTypeKeys[queryParams.type];
             }
         }
-        return {alertType, filterValues: this.getFilterValuesFromQueryParam()};
+        return {
+            alertType,
+            filterValues: this.getFilterValuesFromQueryParam()
+        };
     }
 
     /**
      * getTimeRangeFromQueryParam returns time range information in query params
      * */
     getTimeRangeFromQueryParam() {
-        const {queryParamKey, dateRanges, custom} = Constants;
+        const {queryParamKey, dateRanges, custom, all} = Constants;
         const queryParams = super.getGlobalState(queryParamKey);
         let result = {};
 
         if (queryParams.range) {
             if (queryParams.range.toLowerCase() === custom && queryParams.from && queryParams.to) {
                 result = {range: queryParams.range, from: queryParams.from, to: queryParams.to, sync: false};
-            } else if (dateRanges.indexOf(queryParams.range) !== -1) {
+            } else if (dateRanges.indexOf(queryParams.range) !== -1 || queryParams.range.toLowerCase() === all) {
                 if (queryParams.sync !== undefined) {
                     result = {
-                        range: queryParams.range, from: queryParams.from, to: queryParams.to,
+                        range: queryParams.range,
                         sync: queryParams.sync
                     };
                 } else {
@@ -231,7 +292,9 @@ class APIMAlertsHistory extends Widget {
      * onChangeSyncTimeRange handle change in time range auto sync
      * */
     onChangeSyncTimeRange(syncTimeRange) {
-        this.setState({syncTimeRange}, this.setQueryParam);
+        this.setState({syncTimeRange});
+        this.updateQueryParams(null, null, this.state.selectedTimeRange, null, null, syncTimeRange);
+
     }
 
     /**
@@ -463,12 +526,14 @@ class APIMAlertsHistory extends Widget {
      * handleAlertTypeChange handle change in selected alert type
      * */
     handleAlertTypeChange = event => {
-        this.state.alertType = event.target.value;
+        this.alertTableNoDataMessage = 'Loading alerts history';
 
         this.setState({
-            filteredRows: []
+            filteredRows: [],
+            alertType: event.target.value
         }, this.fetchAlertData);
-        this.setQueryParam();
+        this.updateQueryParams(event.target.value, null, null, null, null, null);
+
     };
 
     /**
@@ -476,7 +541,7 @@ class APIMAlertsHistory extends Widget {
      * */
     fetchAlertData() {
         super.getWidgetChannelManager().unsubscribeWidget(this.props.id);
-        this.handleTableUpdate();
+        this.retrieveAlertsHistory();
     }
 
     /**
@@ -540,7 +605,9 @@ class APIMAlertsHistory extends Widget {
         this.setState({
             filterValues: {},
             filteredRows: this.createAlertHistoryTableData(rows),
-        }, this.setQueryParam)
+        });
+        this.updateQueryParams(null, {}, null, null, null, null);
+
     };
 
     /**
@@ -552,7 +619,8 @@ class APIMAlertsHistory extends Widget {
         this.setState({
             filterValues,
             filteredRows: this.createFilteredAlertHistoryTableData(rows, filterValues)
-        }, this.setQueryParam);
+        });
+        this.updateQueryParams(null, filterValues, null, null, null, null);
     }
 
     /**
@@ -645,23 +713,32 @@ class APIMAlertsHistory extends Widget {
     }
 
     /**
-     * setQueryParam set alert type and filters as query params
+     * updateQueryParams updates query param values
      * */
-    setQueryParam() {
+    updateQueryParams(alertType, filterValues, timeRange, timeFrom, timeTo, sync) {
         const {queryParamKey, custom} = Constants;
-        const {alertType, filterValues, selectedTimeRange, timeTo, timeFrom, syncTimeRange} = this.state;
-        let queryParams = {type: alertType};
+        let queryParams = super.getGlobalState(queryParamKey);
 
-        if (Object.keys(filterValues).length > 0) {
-            queryParams.filters = filterValues;
+        if (alertType) {
+            queryParams.type = alertType;
         }
-        if (selectedTimeRange) {
-            queryParams.range = selectedTimeRange;
-            if (selectedTimeRange === custom) {
+        if (filterValues) {
+            if (Object.keys(filterValues).length > 0) {
+                queryParams.filters = filterValues;
+            } else {
+                delete queryParams.filters;
+            }
+        }
+        if (timeRange) {
+            queryParams.range = timeRange;
+            if (timeRange === custom) {
                 queryParams.from = Moment(timeFrom).format('YYYY-MMM-DD hh:mm:ss A').toLowerCase();
                 queryParams.to = Moment(timeTo).format('YYYY-MMM-DD hh:mm:ss A').toLowerCase();
+                delete queryParams.sync;
             } else {
-                queryParams.sync = syncTimeRange;
+                if (sync !== null) {
+                    queryParams.sync = sync;
+                }
             }
         }
         super.setGlobalState(queryParamKey, queryParams);
@@ -757,7 +834,8 @@ class APIMAlertsHistory extends Widget {
                                         onChangeTime={this.onChangeTime}
                                         getTimeRangeInfo={this.getTimeRangeFromQueryParam}
                                         muiTheme={muiTheme}
-                                        onChangeSyncTimeRange={this.onChangeSyncTimeRange}/>
+                                        onChangeSyncTimeRange={this.onChangeSyncTimeRange}
+                                        onClickAll={this.onClickSelectAll}/>
                                     <AlertsFilter
                                         muiTheme={muiTheme}
                                         onDeleteAllFilters={this.onDeleteAllFilters}

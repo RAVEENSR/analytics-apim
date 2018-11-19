@@ -56,6 +56,16 @@ const Constants = {
         healthAvailability: 'queryApimApiHealthMonitorAlert',
         abnormalResourceAccessPattern: 'queryApimRequestPatternChangedAlert',
     },
+    queryNamesForSelectAll: {
+        allAlerts: 'queryApimAllAlertAll',
+        unseenSourceIPAddress: 'queryApimIPAccessAbnormalityAlertAll',
+        abnormalRequestCount: 'queryApimAbnormalReqAlertAll',
+        abnormalResponseTime: 'queryApimAbnormalResponseTimeAlertAll',
+        tierCrossing: 'queryApimTierLimitHittingAlertAll',
+        abnormalBackendTime: 'queryApimAbnormalBackendTimeAlertAll',
+        healthAvailability: 'queryApimApiHealthMonitorAlertAll',
+        abnormalResourceAccessPattern: 'queryApimRequestPatternChangedAlertAll',
+    },
     alertMessageFieldsForAlertType: {
         unseenSourceIPAddress: ['ip', 'applicationName', 'applicationOwner', 'userId'],
         abnormalRequestCount: ['applicationName', 'applicationOwner', 'api', 'apiVersion'],
@@ -114,6 +124,7 @@ const Constants = {
     tablePaginationRowsPerPageOptions: [5, 10, 25, 50, 100],
     numberOfSeverityLevels: 3,
     custom: 'custom',
+    all:'all',
     dateRanges: ['1mn', '15mn', '1h', '1d', '1w', '2w', '1mo', '3mo', '6mo', '1y'],
     lowGranularityOptions: ['1mn', '15mn', '1h', '1d', '1w', '2w'],
     highGranularityOptions: ['2w', '1mo', '3mo', '6mo', '1y']

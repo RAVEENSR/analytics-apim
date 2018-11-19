@@ -18,6 +18,7 @@
 
 import React from 'react';
 import IconButton from '@material-ui/core/IconButton';
+import Button from '@material-ui/core/Button';
 import {Sync, SyncDisabled} from '@material-ui/icons/';
 import Tooltip from '@material-ui/core/Tooltip';
 import Moment from 'moment';
@@ -41,6 +42,7 @@ export default class DateRangePicker extends React.Component {
         this.publishTimeRange = this.publishTimeRange.bind(this);
         this.handleGranularityChange = this.handleGranularityChange.bind(this);
         this.handleGranularityChangeForCustom = this.handleGranularityChangeForCustom.bind(this);
+        this.handleGranularityChangeForClickAll = this.handleGranularityChangeForClickAll.bind(this);
         this.getStartTime = this.getStartTime.bind(this);
         this.autoSyncClick = this.autoSyncClick.bind(this);
         this.setRefreshInterval = this.setRefreshInterval.bind(this);
@@ -112,9 +114,23 @@ export default class DateRangePicker extends React.Component {
             granularityMode: custom,
             startTime,
             endTime,
+            enableSync: false,
             syncButtonColor: '#BDBDBD',
             syncButton: <SyncDisabled/>,
         });
+    }
+
+    /**
+     * handleGranularityChangeForClickAll handle on click of 'all' time option
+     * */
+    handleGranularityChangeForClickAll() {
+        const {all} = Constants;
+        const {onClickAll} = this.props;
+
+        this.clearRefreshInterval();
+        this.setState({granularityMode: all});
+        this.setRefreshInterval();
+        onClickAll && onClickAll();
     }
 
     /**
@@ -267,9 +283,15 @@ export default class DateRangePicker extends React.Component {
      * loadUserSpecifiedTimeRange load user specified time range
      * */
     loadUserSpecifiedTimeRange(timeRange) {
+        const {all} = Constants;
+
         if (timeRange) {
             this.clearRefreshInterval();
-            this.handleGranularityChange(timeRange);
+            if(timeRange === all) {
+                this.handleGranularityChangeForClickAll();
+            } else {
+                this.handleGranularityChange(timeRange);
+            }
         } else {
             this.handleGranularityChange(this.getTimeRangeName(this.state.options.defaultRange) || '1w');
         }
@@ -348,12 +370,30 @@ export default class DateRangePicker extends React.Component {
     render() {
         const {options, syncButtonColor, syncButton, granularityMode} = this.state;
         const {muiTheme} = this.props;
-        const {custom} = Constants;
+        const {custom, all} = Constants;
 
         return (
             <div
                 style={{display: 'flex'}}
             >
+                <Tooltip
+                    title={
+                        <FormattedMessage id='tooltip.date.range.picker.all'
+                                          defaultMessage='Show all alerts history'/>}
+                >
+                    <Button
+                        onClick={this.handleGranularityChangeForClickAll}
+                        style={{
+                            borderBottom: granularityMode === all ?
+                                (muiTheme.name === 'dark' ? '1px solid red' : '1px solid gray') : '',
+                            textTransform: 'none',
+                            minWidth: 35,
+                            borderRadius: granularityMode === all ? 0 : ''
+                        }}
+                    >
+                        <FormattedMessage id='date.range.picker.all' defaultMessage='All'/>
+                    </Button>
+                </Tooltip>
                 <GranularityModeSelector
                     onChange={this.handleGranularityChange}
                     onChangeCustom={this.handleGranularityChangeForCustom}
