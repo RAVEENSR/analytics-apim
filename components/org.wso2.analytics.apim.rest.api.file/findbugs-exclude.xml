@@ -18,4 +18,12 @@
   -->
 
 <FindBugsFilter>
+    <Match>
+        <Class name="org.wso2.analytics.apim.rest.api.file.ApiException" />
+        <Bug pattern="URF_UNREAD_FIELD" />
+    </Match>
+    <Match>
+        <Class name="org.wso2.analytics.apim.rest.api.file.NotFoundException" />
+        <Bug pattern="URF_UNREAD_FIELD" />
+    </Match>
 </FindBugsFilter>
