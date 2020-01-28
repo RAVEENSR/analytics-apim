@@ -26,8 +26,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.wso2.analytics.apim.idp.client.dao.OAuthAppDAO;
 import org.wso2.analytics.apim.idp.client.dto.DCRClientInfo;
-import org.wso2.analytics.apim.idp.client.dto.DCRClientResponse;
-import org.wso2.analytics.apim.idp.client.dto.DCRError;
 import org.wso2.analytics.apim.idp.client.token.TokenData;
 import org.wso2.analytics.apim.idp.client.token.TokenDataHolder;
 import org.wso2.carbon.analytics.idp.client.core.exception.AuthenticationException;
@@ -36,6 +34,7 @@ import org.wso2.carbon.analytics.idp.client.core.models.Role;
 import org.wso2.carbon.analytics.idp.client.core.models.User;
 import org.wso2.carbon.analytics.idp.client.core.utils.IdPClientConstants;
 import org.wso2.carbon.analytics.idp.client.external.ExternalIdPClient;
+import org.wso2.carbon.analytics.idp.client.external.dto.DCRError;
 import org.wso2.carbon.analytics.idp.client.external.dto.OAuth2IntrospectionResponse;
 import org.wso2.carbon.analytics.idp.client.external.dto.OAuth2TokenInfo;
 import org.wso2.carbon.analytics.idp.client.external.impl.DCRMServiceStub;
@@ -57,8 +56,6 @@ import static org.wso2.analytics.apim.idp.client.ApimIdPClientConstants.FORWARD_
 import static org.wso2.analytics.apim.idp.client.ApimIdPClientConstants.OAUTHAPP_TABLE;
 import static org.wso2.analytics.apim.idp.client.ApimIdPClientConstants.OPEN_ID_SCOPE;
 import static org.wso2.analytics.apim.idp.client.ApimIdPClientConstants.POST_LOGOUT_REDIRECT_URI_PHRASE;
-import static org.wso2.analytics.apim.idp.client.ApimIdPClientConstants.REGEX_BASE;
-import static org.wso2.analytics.apim.idp.client.ApimIdPClientConstants.REGEX_BASE_END;
 import static org.wso2.analytics.apim.idp.client.ApimIdPClientConstants.SPACE;
 import static org.wso2.analytics.apim.idp.client.ApimIdPClientConstants.SUBSCRIBE_SCOPE;
 import static org.wso2.analytics.apim.idp.client.ApimIdPClientConstants.SUPER_TENANT_DOMAIN;
@@ -548,9 +545,9 @@ public class ApimIdPClient extends ExternalIdPClient {
             } else if (response.status() == 400) {  //400 - Known Error
                 try {
                     DCRError error = (DCRError) new GsonDecoder().decode(response, DCRError.class);
-                    String errorString = "Error occurred while introspecting the token. Error: " + error.getErrorCode()
-                            + ". Error Description: " + error.getErrorDescription() + ". Status Code: "
-                            + response.status();
+                    String errorString = "Error occurred while introspecting the token. Error: " +
+                            error.getError() + ". Error Description: " + error.getErrorDescription() +
+                            ". Status Code: " + response.status();
                     LOG.error(errorString);
                     throw new IdPClientException(errorString);
                 } catch (IOException e) {
@@ -583,18 +580,13 @@ public class ApimIdPClient extends ExternalIdPClient {
     private void registerApplication(String appContext, String clientName, String kmUserName)
             throws IdPClientException {
 
-        String grantType =
-                IdPClientConstants.PASSWORD_GRANT_TYPE + SPACE + IdPClientConstants.AUTHORIZATION_CODE_GRANT_TYPE +
-                        SPACE + IdPClientConstants.REFRESH_GRANT_TYPE;
-        String callBackUrl;
+        String loginCallBackUrl;
         String postLogoutRedirectUrl = this.baseUrl + FORWARD_SLASH + appContext;
         if (clientName.equals(ApimIdPClientConstants.DEFAULT_SP_APP_CONTEXT)) {
-            callBackUrl = ApimIdPClientConstants.REGEX_BASE_START + this.baseUrl +
-                    ApimIdPClientConstants.CALLBACK_URL + REGEX_BASE + postLogoutRedirectUrl + REGEX_BASE_END;
+            loginCallBackUrl = this.baseUrl + ApimIdPClientConstants.CALLBACK_URL;
         } else {
-            callBackUrl = ApimIdPClientConstants.REGEX_BASE_START + this.baseUrl +
-                    ApimIdPClientConstants.CALLBACK_URL + appContext + ApimIdPClientConstants.CALLBACK_URL_SUFFIX +
-                    REGEX_BASE + postLogoutRedirectUrl + REGEX_BASE_END;
+            loginCallBackUrl = this.baseUrl + ApimIdPClientConstants.CALLBACK_URL + appContext +
+                    ApimIdPClientConstants.CALLBACK_URL_SUFFIX;
         }
 
         if (LOG.isDebugEnabled()) {
@@ -602,10 +594,15 @@ public class ApimIdPClient extends ExternalIdPClient {
         }
         DCRClientInfo dcrClientInfo = new DCRClientInfo();
         dcrClientInfo.setClientName(clientName);
-        dcrClientInfo.setGrantType(grantType);
-        dcrClientInfo.setCallbackUrl(callBackUrl);
-        dcrClientInfo.setSaasApp(true);
-        dcrClientInfo.setOwner(kmUserName);
+        dcrClientInfo.addGrantType(IdPClientConstants.PASSWORD_GRANT_TYPE);
+        dcrClientInfo.addGrantType(IdPClientConstants.AUTHORIZATION_CODE_GRANT_TYPE);
+        dcrClientInfo.addGrantType(IdPClientConstants.REFRESH_GRANT_TYPE);
+        dcrClientInfo.addCallbackUrl(loginCallBackUrl);
+        dcrClientInfo.addCallbackUrl(postLogoutRedirectUrl);
+        dcrClientInfo.setExtSaasApp(true);
+        dcrClientInfo.setExtSkipConsent(true);
+        dcrClientInfo.setExtSkipLogoutConsent(true);
+//        dcrClientInfo.setOwner(kmUserName);
 
         Response response = dcrmServiceStub.registerApplication(new Gson().toJson(dcrClientInfo));
         if (response == null) {
@@ -616,8 +613,8 @@ public class ApimIdPClient extends ExternalIdPClient {
         }
         if (response.status() == 200) {  //200 - OK
             try {
-                DCRClientResponse dcrClientInfoResponse = (DCRClientResponse) new GsonDecoder()
-                        .decode(response, DCRClientResponse.class);
+                DCRClientInfo dcrClientInfoResponse = (DCRClientInfo) new GsonDecoder()
+                        .decode(response, DCRClientInfo.class);
                 OAuthApplicationInfo oAuthApplicationInfo = new OAuthApplicationInfo(
                         clientName, dcrClientInfoResponse.getClientId(), dcrClientInfoResponse.getClientSecret()
                 );
@@ -628,20 +625,6 @@ public class ApimIdPClient extends ExternalIdPClient {
             } catch (IOException e) {
                 String error = "Error occurred while parsing the DCR application creation response " +
                         "message. Response: '" + response.body().toString() + "'.";
-                LOG.error(error, e);
-                throw new IdPClientException(error, e);
-            }
-        } else if (response.status() == 400) {  //400 - Known Error
-            try {
-                DCRError error = (DCRError) new GsonDecoder().decode(response, DCRError.class);
-                String errorMessage = "Error occurred while DCR application creation. Error: " +
-                        error.getErrorCode() + ". Error Description: " + error.getErrorDescription() +
-                        ". Status Code: " + response.status();
-                LOG.error(errorMessage);
-                throw new IdPClientException(errorMessage);
-            } catch (IOException e) {
-                String error = "Error occurred while parsing the DCR error message. Error: " +
-                        "'" + response.body().toString() + "'.";
                 LOG.error(error, e);
                 throw new IdPClientException(error, e);
             }

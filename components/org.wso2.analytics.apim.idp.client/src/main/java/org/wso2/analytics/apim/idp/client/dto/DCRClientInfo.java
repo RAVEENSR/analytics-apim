@@ -21,6 +21,7 @@ package org.wso2.analytics.apim.idp.client.dto;
 import com.google.gson.annotations.SerializedName;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -28,72 +29,55 @@ import java.util.Objects;
  */
 public final class DCRClientInfo {
 
-    /**
-     * Sample message to this method.
-     * {
-     * "callbackUrl": "www.google.lk",
-     * "clientName": "mdm",
-     * "tokenScope": "Production",
-     * "owner": "admin",
-     * "grantType": "password refresh_token",
-     * "saasApp": true
-     *}
-     */
-
-    @SerializedName("applicationType")
-    private String applicationType;
-    @SerializedName("redirectUris")
-    private ArrayList<String> redirectUris;
-    @SerializedName("clientName")
+    @SerializedName("client_id")
+    private String clientId;
+    @SerializedName("registration_client_uri")
+    private String registrationClientUri;
+    @SerializedName("registration_access_token")
+    private String registrationAccessToken;
+    @SerializedName("client_id_issued_at")
+    private String clientIdIssuedAt;
+    @SerializedName("client_secret")
+    private String clientSecret;
+    @SerializedName("client_secret_expires_at")
+    private String clientSecretExpiresAt;
+    @SerializedName("client_name")
     private String clientName;
-    @SerializedName("logoUri")
-    private String logoUri;
-    @SerializedName("subjectType")
-    private String subjectType;
-    @SerializedName("sectorIdentifierUri")
-    private String sectorIdentifierUri;
-    @SerializedName("tokenEndpointAuthMethod")
+    @SerializedName("redirect_uris")
+    private List<String> redirectURIs;
+    @SerializedName("grant_types")
+    private List<String> grantTypes;
+    @SerializedName("token_endpoint_auth_method")
     private String tokenEndpointAuthMethod;
-    @SerializedName("jwksUri")
+    @SerializedName("logo_uri")
+    private String logoUri;
+    @SerializedName("jwks_uri")
     private String jwksUri;
-    @SerializedName("userInfoEncryptedResponseAlg")
-    private String userInfoEncryptedResponseAlg;
-    @SerializedName("userInfoEncryptedResponseEnc")
-    private String userInfoEncryptedResponseEnc;
-    @SerializedName("contacts")
-    private ArrayList<String> contacts;
-    @SerializedName("requestUris")
-    private ArrayList<String> requestUris;
-    @SerializedName("owner")
-    private String owner;
-    @SerializedName("callbackUrl")
-    private String callbackUrl;
-    @SerializedName("tokenScope")
-    private String tokenScope;
-    @SerializedName("grantType")
-    private String grantType;
-    @SerializedName("saasApp")
-    private boolean saasApp;
-    @SerializedName("audience")
-    private String audience;
-    @SerializedName("tokenType")
-    private String tokenType;
+    @SerializedName("userinfo_signed_response_alg")
+    private String userinfoSignedResponseAlg;
+    @SerializedName("ext_param_owner")
+    private String extParamOwner;
+    @SerializedName("ext_saas_app")
+    private boolean extSaasApp;
+    @SerializedName("ext_skip_consent")
+    private boolean extSkipConsent;
+    @SerializedName("ext_skip_logout_consent")
+    private boolean extSkipLogoutConsent;
 
-
-    public String getApplicationType() {
-        return applicationType;
+    public String getClientId() {
+        return clientId;
     }
 
-    public void setApplicationType(String applicationType) {
-        this.applicationType = applicationType;
+    public void setClientId(String clientId) {
+        this.clientId = clientId;
     }
 
-    public ArrayList<String> getRedirectUris() {
-        return redirectUris;
+    public String getClientSecret() {
+        return clientSecret;
     }
 
-    public void setRedirectUris(ArrayList<String> redirectUris) {
-        this.redirectUris = redirectUris;
+    public void setClientSecret(String clientSecret) {
+        this.clientSecret = clientSecret;
     }
 
     public String getClientName() {
@@ -104,28 +88,52 @@ public final class DCRClientInfo {
         this.clientName = clientName;
     }
 
-    public String getLogoUri() {
-        return logoUri;
+    public List<String> getGrantTypes() {
+        return grantTypes;
     }
 
-    public void setLogoUri(String logoUri) {
-        this.logoUri = logoUri;
+    public void setGrantTypes(List<String> grantTypes) {
+        this.grantTypes = grantTypes;
     }
 
-    public String getSubjectType() {
-        return subjectType;
+    public String getRegistrationClientUri() {
+        return registrationClientUri;
     }
 
-    public void setSubjectType(String subjectType) {
-        this.subjectType = subjectType;
+    public void setRegistrationClientUri(String registrationClientUri) {
+        this.registrationClientUri = registrationClientUri;
     }
 
-    public String getSectorIdentifierUri() {
-        return sectorIdentifierUri;
+    public String getRegistrationAccessToken() {
+        return registrationAccessToken;
     }
 
-    public void setSectorIdentifierUri(String sectorIdentifierUri) {
-        this.sectorIdentifierUri = sectorIdentifierUri;
+    public void setRegistrationAccessToken(String registrationAccessToken) {
+        this.registrationAccessToken = registrationAccessToken;
+    }
+
+    public String getClientIdIssuedAt() {
+        return clientIdIssuedAt;
+    }
+
+    public void setClientIdIssuedAt(String clientIdIssuedAt) {
+        this.clientIdIssuedAt = clientIdIssuedAt;
+    }
+
+    public String getClientSecretExpiresAt() {
+        return clientSecretExpiresAt;
+    }
+
+    public void setClientSecretExpiresAt(String clientSecretExpiresAt) {
+        this.clientSecretExpiresAt = clientSecretExpiresAt;
+    }
+
+    public List<String> getRedirectURIs() {
+        return redirectURIs;
+    }
+
+    public void setRedirectURIs(List<String> redirectURIs) {
+        this.redirectURIs = redirectURIs;
     }
 
     public String getTokenEndpointAuthMethod() {
@@ -136,6 +144,14 @@ public final class DCRClientInfo {
         this.tokenEndpointAuthMethod = tokenEndpointAuthMethod;
     }
 
+    public String getLogoUri() {
+        return logoUri;
+    }
+
+    public void setLogoUri(String logoUri) {
+        this.logoUri = logoUri;
+    }
+
     public String getJwksUri() {
         return jwksUri;
     }
@@ -144,102 +160,64 @@ public final class DCRClientInfo {
         this.jwksUri = jwksUri;
     }
 
-    public String getUserInfoEncryptedResponseAlg() {
-        return userInfoEncryptedResponseAlg;
+    public String getUserinfoSignedResponseAlg() {
+        return userinfoSignedResponseAlg;
     }
 
-    public void setUserInfoEncryptedResponseAlg(String userInfoEncryptedResponseAlg) {
-        this.userInfoEncryptedResponseAlg = userInfoEncryptedResponseAlg;
+    public void setUserinfoSignedResponseAlg(String userinfoSignedResponseAlg) {
+        this.userinfoSignedResponseAlg = userinfoSignedResponseAlg;
     }
 
-    public String getUserInfoEncryptedResponseEnc() {
-        return userInfoEncryptedResponseEnc;
-    }
-
-    public void setUserInfoEncryptedResponseEnc(String userInfoEncryptedResponseEnc) {
-        this.userInfoEncryptedResponseEnc = userInfoEncryptedResponseEnc;
-    }
-
-    public ArrayList<String> getContacts() {
-        return contacts;
-    }
-
-    public void setContacts(ArrayList<String> contacts) {
-        this.contacts = contacts;
-    }
-
-    public ArrayList<String> getRequestUris() {
-        return requestUris;
-    }
-
-    public void setRequestUris(ArrayList<String> requestUris) {
-        this.requestUris = requestUris;
-    }
-
-    public String getOwner() {
-        return owner;
-    }
-
-    public void setOwner(String owner) {
-        this.owner = owner;
-    }
-
-    public String getCallbackUrl() {
-        return callbackUrl;
-    }
-
-    public void setCallbackUrl(String callbackUrl) {
-        this.callbackUrl = callbackUrl;
-    }
-
-    public String getTokenScope() {
-        return tokenScope;
-    }
-
-    public void setTokenScope(String tokenScope) {
-        this.tokenScope = tokenScope;
-    }
-
-    public String getGrantType() {
-        return grantType;
-    }
-
-    public void setGrantType(String grantType) {
-        this.grantType = grantType;
-    }
-
-    public boolean isSaasApp() {
-        return saasApp;
-    }
-
-    public void setSaasApp(boolean saasApp) {
-        this.saasApp = saasApp;
-    }
-
-    public String getAudience() {
-        return audience;
-    }
-
-    public void setAudience(String audience) {
-        this.audience = audience;
-    }
-
-    public String getTokenType() {
-        return tokenType;
-    }
-
-    public void setTokenType(String tokenType) {
-        this.tokenType = tokenType;
+    public void addGrantType(String grantType) {
+        if (grantType == null) {
+            return;
+        }
+        if (grantTypes == null) {
+            grantTypes = new ArrayList<>();
+        }
+        grantTypes.add(grantType);
     }
 
     public void addCallbackUrl(String callback) {
         if (callback == null) {
             return;
         }
-        if (redirectUris == null) {
-            redirectUris = new ArrayList<>();
+        if (redirectURIs == null) {
+            redirectURIs = new ArrayList<>();
         }
-        redirectUris.add(callback);
+        redirectURIs.add(callback);
+    }
+
+    public String getExtParamOwner() {
+        return extParamOwner;
+    }
+
+    public void setExtParamOwner(String extParamOwner) {
+        this.extParamOwner = extParamOwner;
+    }
+
+    public boolean getExtSaasApp() {
+        return extSaasApp;
+    }
+
+    public void setExtSaasApp(boolean extSaasApp) {
+        this.extSaasApp = extSaasApp;
+    }
+
+    public boolean getExtSkipConsent() {
+        return extSkipConsent;
+    }
+
+    public void setExtSkipConsent(boolean extSkipConsent) {
+        this.extSkipConsent = extSkipConsent;
+    }
+
+    public boolean getExtSkipLogoutConsent() {
+        return extSkipLogoutConsent;
+    }
+
+    public void setExtSkipLogoutConsent(boolean extSkipLogoutConsent) {
+        this.extSkipLogoutConsent = extSkipLogoutConsent;
     }
 
     @Override
@@ -251,31 +229,29 @@ public final class DCRClientInfo {
             return false;
         }
         DCRClientInfo that = (DCRClientInfo) o;
-        return saasApp == that.saasApp &&
-                Objects.equals(applicationType, that.applicationType) &&
-                Objects.equals(redirectUris, that.redirectUris) &&
+        return Objects.equals(clientId, that.clientId) &&
+                Objects.equals(registrationClientUri, that.registrationClientUri) &&
+                Objects.equals(registrationAccessToken, that.registrationAccessToken) &&
+                Objects.equals(clientIdIssuedAt, that.clientIdIssuedAt) &&
+                Objects.equals(clientSecret, that.clientSecret) &&
+                Objects.equals(clientSecretExpiresAt, that.clientSecretExpiresAt) &&
                 Objects.equals(clientName, that.clientName) &&
-                Objects.equals(logoUri, that.logoUri) &&
-                Objects.equals(subjectType, that.subjectType) &&
-                Objects.equals(sectorIdentifierUri, that.sectorIdentifierUri) &&
+                Objects.equals(redirectURIs, that.redirectURIs) &&
+                Objects.equals(grantTypes, that.grantTypes) &&
                 Objects.equals(tokenEndpointAuthMethod, that.tokenEndpointAuthMethod) &&
+                Objects.equals(logoUri, that.logoUri) &&
                 Objects.equals(jwksUri, that.jwksUri) &&
-                Objects.equals(userInfoEncryptedResponseAlg, that.userInfoEncryptedResponseAlg) &&
-                Objects.equals(userInfoEncryptedResponseEnc, that.userInfoEncryptedResponseEnc) &&
-                Objects.equals(contacts, that.contacts) &&
-                Objects.equals(requestUris, that.requestUris) &&
-                Objects.equals(owner, that.owner) &&
-                Objects.equals(callbackUrl, that.callbackUrl) &&
-                Objects.equals(tokenScope, that.tokenScope) &&
-                Objects.equals(grantType, that.grantType) &&
-                Objects.equals(audience, that.audience) &&
-                Objects.equals(tokenType, that.tokenType);
+                Objects.equals(userinfoSignedResponseAlg, that.userinfoSignedResponseAlg) &&
+                Objects.equals(extParamOwner, that.extParamOwner) &&
+                Objects.equals(extSaasApp, that.extSaasApp) &&
+                Objects.equals(extSkipConsent, that.extSkipConsent) &&
+                Objects.equals(extSkipLogoutConsent, that.extSkipLogoutConsent);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(applicationType, redirectUris, clientName, logoUri, subjectType, sectorIdentifierUri,
-                tokenEndpointAuthMethod, jwksUri, userInfoEncryptedResponseAlg, userInfoEncryptedResponseEnc, contacts,
-                requestUris, owner, callbackUrl, tokenScope, grantType, saasApp, audience, tokenType);
+        return Objects.hash(clientId, registrationClientUri, registrationAccessToken, clientIdIssuedAt, clientSecret,
+                clientSecretExpiresAt, clientName, redirectURIs, grantTypes, tokenEndpointAuthMethod, logoUri, jwksUri,
+                userinfoSignedResponseAlg, extParamOwner, extSaasApp, extSkipConsent, extSkipLogoutConsent);
     }
 }
