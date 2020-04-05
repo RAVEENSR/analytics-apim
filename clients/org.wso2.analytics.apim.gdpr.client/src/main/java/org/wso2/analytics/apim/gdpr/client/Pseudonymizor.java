@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import org.wso2.analytics.apim.gdpr.client.bean.DatabaseInfo;
 import org.wso2.analytics.apim.gdpr.client.bean.GDPRClientConfiguration;
 import org.wso2.analytics.apim.gdpr.client.bean.TableEntryInfo;
+import org.wso2.analytics.apim.gdpr.client.exceptions.GDPRClientException;
 import org.wso2.analytics.apim.gdpr.client.internal.dao.ClientDAO;
 import org.wso2.carbon.config.ConfigProviderFactory;
 import org.wso2.carbon.config.ConfigurationException;
@@ -39,15 +40,17 @@ import java.nio.file.Paths;
 import java.util.List;
 
 import static org.wso2.analytics.apim.gdpr.client.GDPRClientConstants.AT;
+import static org.wso2.analytics.apim.gdpr.client.GDPRClientConstants.CONF_FOLDER;
+import static org.wso2.analytics.apim.gdpr.client.GDPRClientConstants.FILE_NAME;
+import static org.wso2.analytics.apim.gdpr.client.GDPRClientConstants.SUPER_TENANT_DOMAIN;
 
 /**
  * Main class for APIM GDPR client.
  */
 public class Pseudonymizor {
 
-    private static final Logger logger = LoggerFactory.getLogger(Pseudonymizor.class);
-    private static final String CONF_FOLDER = "conf";
-    private static final String FILE_NAME = "deployment.yaml";
+    private static final Logger LOG = LoggerFactory.getLogger(Pseudonymizor.class);
+
 
     public static void main(String[] args) {
         Path deploymentConfigPath = Paths.get(CONF_FOLDER, FILE_NAME);
@@ -56,9 +59,13 @@ public class Pseudonymizor {
             ConfigProvider configProvider = ConfigProviderFactory.getConfigProvider(deploymentConfigPath);
             GDPRClientConfiguration gdprClientConfiguration = configProvider
                     .getConfigurationObject(GDPRClientConfiguration.class);
+            // TODO: Add null and empty checks for required fields read as command line arguments
             String username = gdprClientConfiguration.getUsername();
-            String pseudonym = gdprClientConfiguration.getSaltValue();
+            String pseudonym = gdprClientConfiguration.getPseudonym();
             String tenantDomain = gdprClientConfiguration.getTenantDomain();
+            String userEmail = gdprClientConfiguration.getUserEmail();
+            String userIP = gdprClientConfiguration.getUserIP(); //TODO: this is a mandatory field
+            boolean isUserInSuperTenantDomain = tenantDomain.equalsIgnoreCase(SUPER_TENANT_DOMAIN);
             String usernameWithTenantDomain = username.concat(AT).concat(tenantDomain);
             String pseudonymWithTenantDomain = pseudonym.concat(AT).concat(tenantDomain);
             DataSourcesConfiguration dataSourcesConfiguration
@@ -86,32 +93,205 @@ public class Pseudonymizor {
                             String tableName = tableEntry.getTableName();
                             boolean isTableExists = clientDAO.checkTableExists(tableName);
                             if (!isTableExists) {
-                                logger.warn("Table {} does not exists in the database {}.",
-                                        gdprClientConfiguration, databaseName);
-                                break;
+                                LOG.warn("Table {} does not exists in the database {}.", tableName, databaseName);
+                                continue;
                             }
+                            // TODO: check for null or empty for the required fields
                             String columnName = tableEntry.getColumnName();
-                            boolean isUsernameWithTenantDomain = tableEntry.isUsernameWithTenantDomain();
-                            String tenantDomainColumnName = tableEntry.getTenantDomainColumnName();
-                            if (isUsernameWithTenantDomain) {
-                                clientDAO.updateTenantDomainIncludedUsernameWithTenantDomainTableEntry(
-                                        tableName,
-                                        columnName,
-                                        usernameWithTenantDomain,
-                                        pseudonymWithTenantDomain,
-                                        tenantDomainColumnName,
-                                        tenantDomain
-                                );
+//                            boolean isEmailColumn = tableEntry.isEmailColumn();
+//                            boolean isIPColumn = tableEntry.isIPColumn();
+                            boolean isEmailColumn = false;
+                            boolean isIPColumn = false;
+                            boolean isTextReplace = tableEntry.isTextReplace();
+                            GDPRClientConstants.ColumnTypes columnType = tableEntry.getColumnType();
+
+                            if (columnType == GDPRClientConstants.ColumnTypes.EMAIL) {
+                                isEmailColumn = true;
+                            } else if (columnType == GDPRClientConstants.ColumnTypes.IP) {
+                                isIPColumn = true;
                             }
+
+                            if (!isEmailColumn && !isIPColumn) {
+                                boolean isSuperTenantUsernameHasTenantDomain
+                                        = tableEntry.isSuperTenantUsernameHasTenantDomain();
+                                boolean isOtherTenantUsernameHasTenantDomain
+                                        = tableEntry.isOtherTenantUsernameHasTenantDomain();
+
+                                if (!isTextReplace) {
+                                    /*
+                                     * Scenario 1:
+                                     * User is in the super tenant space. Super tenant's username is saved with the
+                                     * tenant domain.
+                                     * ex: admin@carbon.super, usera@carbon.super
+                                     * */
+                                    if (isUserInSuperTenantDomain && isSuperTenantUsernameHasTenantDomain) {
+                                        clientDAO.updateTableEntry(tableName, columnName, usernameWithTenantDomain,
+                                                pseudonymWithTenantDomain);
+                                        continue;
+                                    }
+
+                                    /*
+                                     * Scenario 2:
+                                     * User is in the super tenant space. Super tenant's username is saved without the
+                                     * tenant domain.
+                                     * ex: admin, usera
+                                     *
+                                     * if clause => isUserInSuperTenantDomain && !isSuperTenantUsernameHasTenantDomain
+                                     * TODO: Include full if clause with each if scenario
+                                     * */
+                                    if (isUserInSuperTenantDomain) {
+                                        clientDAO.updateTableEntry(tableName, columnName, username, pseudonym);
+                                        continue;
+                                    }
+
+                                    /*
+                                     * Scenario 3:
+                                     * User is not in the super tenant space(is in some other tenant). Other tenant's
+                                     * username is saved with the tenant domain.
+                                     * ex: admin@abc.com, usera@abc.com
+                                     *
+                                     * if clause => !isUserInSuperTenantDomain && isOtherTenantUsernameHasTenantDomain
+                                     * */
+                                    if (isOtherTenantUsernameHasTenantDomain) {
+                                        clientDAO.updateTableEntry(tableName, columnName, usernameWithTenantDomain,
+                                                pseudonymWithTenantDomain);
+                                        continue;
+                                    }
+
+                                    throw new GDPRClientException("Could not find a relevant update query for table " +
+                                            "entry: [" + tableEntry.toString() + "] in database: " + databaseName
+                                            + ".");
+                                }
+
+                                String preReplaceText = tableEntry.getPreReplaceText();
+                                String postReplaceText = tableEntry.getPostReplaceText();
+
+                                /*
+                                 * Scenario 4:
+                                 * User is in the super tenant space. Super tenant's username is saved with the
+                                 * tenant domain(ex: admin@carbon.super, usera@carbon.super) with other text in the same
+                                 * field.
+                                 * ex: In APIMALLALERT table username is saved like this in the message field ->
+                                 * "User admin@carbon.super frequently crosses the limit set."
+                                 * */
+                                if (isUserInSuperTenantDomain && isSuperTenantUsernameHasTenantDomain) {
+                                    clientDAO.performStringReplaceAndUpdateTableEntry(tableName, columnName,
+                                            usernameWithTenantDomain, pseudonymWithTenantDomain, preReplaceText,
+                                            postReplaceText);
+                                    continue;
+                                }
+
+                                /*
+                                 * Scenario 5:
+                                 * User is in the super tenant space. Super tenant's username is saved without the
+                                 * tenant domain. TODO: Do we need this?
+                                 * ex: admin, usera
+                                 *
+                                 * if clause => isUserInSuperTenantDomain && !isSuperTenantUsernameHasTenantDomain
+                                 * */
+                                if (isUserInSuperTenantDomain) {
+                                    clientDAO.performStringReplaceAndUpdateTableEntry(
+                                            tableName, columnName, username, pseudonym, preReplaceText,
+                                            postReplaceText);
+                                    continue;
+                                }
+
+                                /*
+                                 * Scenario 6:
+                                 * User is not in the super tenant space(is in some other tenant). Other tenant's
+                                 * username is saved with the tenant domain.
+                                 * ex: admin@abc.com, usera@abc.com //TODO 4 and 6 can be combined?
+                                 *
+                                 * if clause => !isUserInSuperTenantDomain && isOtherTenantUsernameHasTenantDomain
+                                 * */
+                                if (isOtherTenantUsernameHasTenantDomain) {
+                                    clientDAO.performStringReplaceAndUpdateTableEntry(
+                                            tableName, columnName, usernameWithTenantDomain, pseudonymWithTenantDomain,
+                                            preReplaceText, postReplaceText);
+                                    continue;
+                                }
+
+                                throw new GDPRClientException("Could not find a relevant update query for table " +
+                                        "entry: [" + tableEntry.toString() + "] in database: " + databaseName + ".");
+                            }
+
+                            if (!isIPColumn) {
+                                /*
+                                 * Scenario 7:
+                                 * Replace the email stored in the emails field.
+                                 * ex: In APIMALERTSTAKEHOLDERINFO table emails are stored like this ->
+                                 * "user1@abc.com, user2@abc.com, user3@abc.com". In here we need to do perform a
+                                 * string replace to replace the email value with the pseudonym value.
+                                 * */
+                                if (isTextReplace) {
+                                    // skip update query for email entries if user email is not provided
+                                    if (userEmail == null || userEmail.isEmpty()) {
+                                        continue;
+                                    }
+                                    String preReplaceText = tableEntry.getPreReplaceText();
+                                    String postReplaceText = tableEntry.getPostReplaceText();
+                                    // perform string replace to replace user email value
+                                    clientDAO.performStringReplaceAndUpdateTableEntry(
+                                            tableName, columnName, userEmail, pseudonym, preReplaceText,
+                                            postReplaceText);
+                                    continue;
+                                }
+
+                                /*
+                                 * Scenario 8:
+                                 * Replace the email stored in the email field. In this scenario only one email entry is
+                                 * stored.(unlike multiple emails in the same field in scenario 7)
+                                 *
+                                 * if clause => isEmailColumn && !isTextReplace
+                                 * */
+                                // TODO: is this useful. Is this ever used?
+                                // skip update query for email entries if user email is not provided
+                                if (userEmail == null || userEmail.isEmpty()) {
+                                    continue;
+                                }
+                                clientDAO.updateTableEntry(tableName, columnName, userEmail, pseudonym);
+                            }
+
+                            /*
+                             * Scenario 9:
+                             * Replace the ip address stored in a message field.
+                             * ex: In APIMALLALERT table, ip address is stored like this ->
+                             * "A request from a old IP (127.0.0.1) detected by user:john@abc.com using
+                             * application:DefaultApplication owned by john@abc.com.". In here we need to do perform a
+                             * string replace to replace the ip address with the pseudonym value.
+                             * */
+                            if (isTextReplace) {
+                                String preReplaceText = tableEntry.getPreReplaceText();
+                                String postReplaceText = tableEntry.getPostReplaceText();
+                                // perform string replace to replace user ip address
+                                clientDAO.performStringReplaceAndUpdateTableEntry(
+                                        tableName, columnName, userIP, pseudonym, preReplaceText, postReplaceText);
+                                continue;
+                            }
+
+                            /*
+                             * Scenario 10:
+                             * Replace the ip address stored in a ip address field. In this scenario only one ip address
+                             * entry is stored.(unlike within a message with other texts in scenario 9) In this scenario
+                             * username associated to the IP also replaced with the pseudonym value.
+                             *
+                             * if clause => !isTextReplace
+                             * */
+                            // TODO: Do I need to replace ip address with pseudonym or with generated UUID
+                            String ipUsernameColumnName = tableEntry.getIpUsernameColumnName();
+                            clientDAO.updateIPAndUsernameInTableEntry(tableName, columnName, ipUsernameColumnName,
+                                    userIP, usernameWithTenantDomain, pseudonym, pseudonymWithTenantDomain);
                         }
                         break;
                     }
                 }
             }
         } catch (ConfigurationException e) {
-            logger.error("Error in getting configuration", e);
+            LOG.error("Error in getting configuration", e);
         } catch (DataSourceException e) {
-            logger.error("Error occurred while initialising data sources.", e);
+            LOG.error("Error occurred while initialising data sources.", e);
+        } catch (GDPRClientException e) {
+            LOG.error("Error occurred while updating the table entries.", e);
         }
     }
 }
