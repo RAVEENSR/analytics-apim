@@ -179,5 +179,9 @@
             <directory>APIMPlaceholder/dist</directory>
             <outputDirectory></outputDirectory>
         </fileSet>
+        <fileSet>
+            <directory>APIMAdminAlertConfiguration/dist</directory>
+            <outputDirectory></outputDirectory>
+        </fileSet>
     </fileSets>
 </assembly>

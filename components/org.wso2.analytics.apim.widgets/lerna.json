@@ -38,7 +38,8 @@
     "APIMGeoBasedInvocations",
     "APIMApiUsage",
     "DateTimeRangePicker",
-    "APIMPlaceholder"
+    "APIMPlaceholder",
+    "APIMAdminAlertConfiguration"
   ],
   "version": "1.0.0"
 }
