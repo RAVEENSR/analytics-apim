@@ -1,21 +1,20 @@
 {
-  "name": "APIMAdminAlertConfigurationwidget",
+  "name": "APIM Admin Alert Configuration",
   "id": "APIMAdminAlertConfiguration",
   "thumbnailURL": "",
   "configs": {
     "pubsub": {
-      "types": ["publisher"]
+      "types": ["subscriber"]
     },
     "providerConfig" : {
       "configs": {
         "type": "SiddhiStoreDataProvider",
         "config": {
-          "siddhiApp": "@App:name('Subscriber_AlertConf')  @PrimaryKey('applicationId','apiName', 'apiVersion') @store(type=\"rdbms\" , datasource=\"APIM_ANALYTICS_DB\") define table ApiSubscriberAlertConfiguration (applicationId string,apiName string, apiVersion string, thresholdRequestCountPerMin int);",
+          "siddhiApp": "@App:name('APIM_STAKEHOLDER_ALERT') @App:description('Store the alert subscribers information in the database') @store(type = \"rdbms\", datasource = \"APIM_ANALYTICS_DB\") @PrimaryKey('userId','isSubscriber','isPublisher','isAdmin') define table ApimAlertStakeholderInfo(userId string, alertTypes string, emails string, isSubscriber bool, isPublisher bool, isAdmin bool);",
           "queryData": {
-            "query": "from ApiSubscriberAlertConfiguration select applicationId ,apiName , apiVersion , thresholdRequestCountPerMin;",
-            "queryInsert" : "select '{{applicationId}}' as applicationId,'{{apiName}}' as apiName, '{{apiVersion}}' as apiVersion,{{tRequestCount}} as thresholdRequestCountPerMin update or insert into ApiSubscriberAlertConfiguration set ApiSubscriberAlertConfiguration.thresholdRequestCountPerMin = thresholdRequestCountPerMin on ApiSubscriberAlertConfiguration.applicationId == applicationId and ApiSubscriberAlertConfiguration.apiName == apiName and ApiSubscriberAlertConfiguration.apiVersion == apiVersion",
-            "queryDelete" : "delete ApiSubscriberAlertConfiguration on ApiSubscriberAlertConfiguration.applicationId == '{{applicationId}}' and ApiSubscriberAlertConfiguration.apiName == '{{apiName}}' and ApiSubscriberAlertConfiguration.apiVersion == '{{apiVersion}}'"
-
+            "query": "from ApimAlertStakeholderInfo select alertTypes, emails on ApimAlertStakeholderInfo.userId == {{USERNAME}} and ApimAlertStakeholderInfo.isAdmin == true;",
+            "queryInsert" : "select '{{USERNAME}}' as userId, '{{ALERT_TYPES}}' as alertTypes, '{{EMAILS}}' as emails, false as isSubscriber, false as isPublisher, true as isAdmin update or insert into ApimAlertStakeholderInfo set ApimAlertStakeholderInfo.userId = userId, ApimAlertStakeholderInfo.alertTypes = alertTypes, ApimAlertStakeholderInfo.emails = emails, ApimAlertStakeholderInfo.isSubscriber = isSubscriber, ApimAlertStakeholderInfo.isPublisher = isPublisher, ApimAlertStakeholderInfo.isAdmin = isAdmin on ApimAlertStakeholderInfo.userId == userId and ApimAlertStakeholderInfo.isAdmin == isAdmin;",
+            "queryDelete" : "delete ApimAlertStakeholderInfo on ApimAlertStakeholderInfo.userId == '{{USERNAME}}' and ApimAlertStakeholderInfo.isAdmin == true;"
           },
           "publishingInterval": 60
         }
